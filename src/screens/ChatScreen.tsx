@@ -289,6 +289,33 @@ const AVAILABLE_MODELS = [
   },
 ];
 
+// ── Splash Screen (Boot Animation) ──────────────────────────────────────────
+function SplashScreen() {
+  const pulse = useRef(new Animated.Value(0.8)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulse, { toValue: 1.1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(pulse, { toValue: 0.9, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      )
+    ]).start();
+  }, []);
+
+  return (
+    <View style={[S.screen, { alignItems: 'center', justifyContent: 'center' }]}>
+      <Animated.View style={{ opacity, transform: [{ scale: pulse }], alignItems: 'center' }}>
+        <LogoMark size={90} />
+        <Text style={{ color: C.textPrimary, fontSize: 32, fontWeight: '800', letterSpacing: -1, marginTop: 24 }}>Nexus</Text>
+        <Text style={{ color: C.accent, fontSize: 14, fontWeight: '600', marginTop: 8, letterSpacing: 2, textTransform: 'uppercase' }}>Awakening Core</Text>
+      </Animated.View>
+    </View>
+  );
+}
 
 // ── Animated Setup Screen (Model Store) ───────────────────────────────────
 function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownload, onCancel, onSettings }: any) {
@@ -404,6 +431,7 @@ function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownl
 export function ChatScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState(getSettings());
+  const [isAppBooting, setIsAppBooting] = useState(true);
   const [modelReady, setModelReady] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -442,6 +470,10 @@ export function ChatScreen({ navigation }: Props) {
         setModelReady(false);
       }
     } catch (e) { console.error(e); }
+    finally {
+      // Ensure the splash animation plays for at least 2.5 seconds for a premium feel
+      setTimeout(() => setIsAppBooting(false), 2500);
+    }
   };
 
   const handleDownload = async (urlToDownload: string) => {
@@ -559,6 +591,10 @@ export function ChatScreen({ navigation }: Props) {
     if (item.role === 'assistant' && item.content === '' && isGenerating) return <TypingIndicator />;
     return <MessageBubble item={item} isGenerating={isCurrentlyGenerating} />;
   }, [messages, isGenerating]);
+
+  if (isAppBooting) {
+    return <SplashScreen />;
+  }
 
   if (!modelReady) {
     return (
