@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   FlatList, KeyboardAvoidingView, Platform,
-  Animated, Easing, Dimensions, Modal, ScrollView, Alert,
-  ActivityIndicator
+  Animated, Easing, Dimensions, Modal, ScrollView, Alert, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,40 +10,35 @@ import { RootStackParamList } from '../../App';
 import { getSettings, saveSettings, storage, CHAT_HISTORY_KEY } from '../services/storage';
 import { checkModelExists, downloadModel, getModelPath, deleteModel, cancelDownload } from '../services/modelManager';
 import { initLlama, LlamaContext } from 'llama.rn';
-
+import { NativeModules, PermissionsAndroid } from 'react-native';
+import { getMemoryContextString, addMemory, parseMemoryActions } from '../services/MemoryManager';
+import { GoogleAIEmblem, ArrowLeftIcon, SendArrowIcon, AttachmentIcon, CopyIcon } from '../components/GoogleIcons';
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 type Message = { id: string; role: 'user' | 'assistant' | 'system'; content: string };
 
 const { width: W, height: H } = Dimensions.get('window');
 
 const C = {
-  bg: '#080C14',
-  surface: '#0F1422',
-  surfaceHighlight: '#1A2138',
-  border: '#1C2035',
-  accent: '#7C5CFC',
-  accentSoft: '#3D2E80',
-  userBubble: '#1E1540',
-  userBubbleBorder: '#4C35A0',
-  aiBubble: '#0F1422',
-  textPrimary: '#E8E9F3',
-  textSecondary: '#8B95B1',
-  textMuted: '#353A55',
-  green: '#10B981',
-  blue: '#3B82F6',
-  orange: '#F59E0B',
-  red: '#EF4444',
-  purple: '#8B5CF6'
+  bg: '#131314',
+  surface: '#1E1F22',
+  surfaceHighlight: '#282A2F',
+  border: 'rgba(255, 255, 255, 0.08)',
+  accent: '#4285F4',
+  accentSoft: '#1A3B6E',
+  userBubble: '#004A77',
+  userBubbleBorder: '#005D96',
+  aiBubble: '#1E1F22',
+  textPrimary: '#F2F2F2',
+  textSecondary: '#9AA0A6',
+  textMuted: '#5F6368',
+  green: '#34A853',
+  blue: '#4285F4',
+  orange: '#FBBC04',
+  red: '#EA4335',
+  purple: '#A142F4'
 };
 
 // ── Icons ──────────────────────────────────────────────────────────────────
-const SendIcon = () => (
-  <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-    <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fff', marginBottom: 2 }} />
-    <View style={{ width: 2, height: 5, backgroundColor: '#fff', borderRadius: 1 }} />
-  </View>
-);
-
 const StopIcon = () => (
   <View style={{ width: 12, height: 12, backgroundColor: '#fff', borderRadius: 2 }} />
 );
@@ -56,6 +50,21 @@ const ClearIcon = () => (
   </View>
 );
 
+const MicIcon = ({ active }: { active: boolean }) => {
+  const color = active ? C.accent : C.textSecondary;
+  return (
+    <View style={{ width: 18, height: 20, alignItems: 'center' }}>
+      {/* Capsule body */}
+      <View style={{ width: 8, height: 12, borderRadius: 4, borderWidth: 2, borderColor: color, backgroundColor: active ? C.accent + '30' : 'transparent' }} />
+      {/* Stand arm */}
+      <View style={{ width: 12, height: 2, borderBottomLeftRadius: 6, borderBottomRightRadius: 6, borderLeftWidth: 1.5, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: color, marginTop: 1 }} />
+      {/* Base */}
+      <View style={{ width: 1.5, height: 2, backgroundColor: color, marginTop: 0 }} />
+      <View style={{ width: 6, height: 1.5, backgroundColor: color, borderRadius: 1 }} />
+    </View>
+  );
+};
+
 const MenuIcon = () => (
   <View style={{ gap: 3 }}>
     <View style={{ width: 14, height: 1.5, backgroundColor: C.textSecondary, borderRadius: 1 }} />
@@ -64,122 +73,124 @@ const MenuIcon = () => (
   </View>
 );
 
-// ── Logo Mark ─────────────────────────────────────────────────────────────
+// ── Moon Studio Official Logo Mark ─────────────────────────────────────────
 function LogoMark({ size = 36 }: { size?: number }) {
   const pulse = useRef(new Animated.Value(1)).current;
-  const glow = useRef(new Animated.Value(0.3)).current;
+  const glow = useRef(new Animated.Value(0.4)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(pulse, { toValue: 1.08, duration: 1800, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
-          Animated.timing(pulse, { toValue: 1, duration: 1800, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+          Animated.timing(pulse, { toValue: 1.06, duration: 2400, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
+          Animated.timing(pulse, { toValue: 1, duration: 2400, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
         ]),
         Animated.sequence([
-          Animated.timing(glow, { toValue: 0.9, duration: 1800, useNativeDriver: true }),
-          Animated.timing(glow, { toValue: 0.3, duration: 1800, useNativeDriver: true }),
+          Animated.timing(glow, { toValue: 0.85, duration: 2400, useNativeDriver: true }),
+          Animated.timing(glow, { toValue: 0.4, duration: 2400, useNativeDriver: true }),
         ]),
       ])
     ).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <Animated.View style={{
         position: 'absolute', width: size * 1.5, height: size * 1.5,
-        borderRadius: size, borderWidth: 1, borderColor: C.accent,
+        borderRadius: size * 0.75, backgroundColor: 'rgba(0, 242, 254, 0.18)',
         opacity: glow, transform: [{ scale: pulse }],
       }} />
-      <View style={{
-        width: size, height: size, borderRadius: size * 0.28,
-        backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.accent,
-        alignItems: 'center', justifyContent: 'center',
-        shadowColor: C.accent, shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.6, shadowRadius: 10, elevation: 8,
+      <Animated.View style={{
+        width: size, height: size, alignItems: 'center', justifyContent: 'center',
+        transform: [{ scale: pulse }], borderRadius: size / 2, overflow: 'hidden',
+        borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.4)',
       }}>
-        <View style={{ width: size * 0.48, height: size * 0.52, position: 'relative' }}>
-          <View style={{ position: 'absolute', left: 0, top: 0, width: 2.5, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-          <View style={{ position: 'absolute', right: 0, top: 0, width: 2.5, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-          <View style={{
-            position: 'absolute', left: 2, top: 0,
-            width: Math.sqrt((size * 0.44) ** 2 + (size * 0.52) ** 2) * 0.6,
-            height: 2.5, backgroundColor: C.accent, borderRadius: 1,
-            transform: [{ rotate: '35deg' }, { translateX: 0 }],
-          }} />
-        </View>
-      </View>
+        <Image 
+          source={require('../assets/moon_icon.png')} 
+          style={{ width: size, height: size }} 
+          resizeMode="cover" 
+        />
+      </Animated.View>
     </View>
   );
 }
 
-// ── AI Avatar ─────────────────────────────────────────────────────────────
-function AIAvatar({ size = 26, isGenerating = false }: { size?: number, isGenerating?: boolean }) {
+// ── Moon Studio Avatar ────────────────────────────────────────────────────
+function AIAvatar({ size = 28, isGenerating = false }: { size?: number, isGenerating?: boolean }) {
   const spin = useRef(new Animated.Value(0)).current;
+  const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (isGenerating) {
       Animated.loop(
-        Animated.timing(spin, { toValue: 1, duration: 2500, useNativeDriver: true, easing: Easing.linear })
+        Animated.parallel([
+          Animated.timing(spin, { toValue: 1, duration: 3000, useNativeDriver: true, easing: Easing.linear }),
+          Animated.sequence([
+            Animated.timing(pulse, { toValue: 1.15, duration: 800, useNativeDriver: true }),
+            Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+          ])
+        ])
       ).start();
     } else {
       spin.stopAnimation();
+      pulse.stopAnimation();
       spin.setValue(0);
+      pulse.setValue(1);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGenerating]);
 
   const spinInterpolate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
   return (
     <View style={{
-      width: size, height: size, borderRadius: size * 0.3,
-      backgroundColor: C.surface, borderWidth: 1, borderColor: isGenerating ? C.accent : C.border,
+      width: size, height: size, borderRadius: size * 0.35,
+      backgroundColor: '#1E1F22', borderWidth: 1, borderColor: isGenerating ? '#00F2FE' : 'rgba(255,255,255,0.1)',
       alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      shadowColor: isGenerating ? '#00F2FE' : 'transparent', shadowOpacity: 0.6, shadowRadius: 6, elevation: 4
     }}>
       {isGenerating && (
         <Animated.View style={{
-          position: 'absolute', width: size, height: size,
-          borderRadius: size * 0.3, borderWidth: 1, borderColor: C.accent,
-          borderStyle: 'dashed', transform: [{ rotate: spinInterpolate }]
+          position: 'absolute', width: size + 6, height: size + 6,
+          borderRadius: (size + 6) * 0.35, borderWidth: 1.5, borderColor: '#7F00FF',
+          borderStyle: 'dashed', transform: [{ rotate: spinInterpolate }, { scale: pulse }]
         }} />
       )}
-      <View style={{ width: size * 0.42, height: size * 0.48, position: 'relative' }}>
-        <View style={{ position: 'absolute', left: 0, top: 0, width: 1.5, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-        <View style={{ position: 'absolute', right: 0, top: 0, width: 1.5, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-        <View style={{
-          position: 'absolute', left: 1.5, top: 0,
-          width: size * 0.32, height: 1.5, backgroundColor: C.accent, borderRadius: 1,
-          transform: [{ rotate: '38deg' }],
-        }} />
-      </View>
+      <GoogleAIEmblem size={size * 0.82} />
     </View>
   );
 }
 
-// ── Typing indicator ───────────────────────────────────────────────────────
+// ── Typing indicator (Moon Studio Lunar Engine) ────────────────────────────
 function TypingIndicator() {
-  const anims = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
+  const anims = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
+  const colors = ['#00F2FE', '#7F00FF', '#FF007F', '#3B82F6'];
+
   useEffect(() => {
     const loop = (a: Animated.Value, delay: number) => Animated.loop(
       Animated.sequence([
         Animated.delay(delay),
-        Animated.timing(a, { toValue: 1, duration: 400, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
-        Animated.timing(a, { toValue: 0, duration: 400, useNativeDriver: true, easing: Easing.in(Easing.quad) }),
-        Animated.delay(800 - delay),
+        Animated.timing(a, { toValue: 1, duration: 350, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
+        Animated.timing(a, { toValue: 0.2, duration: 350, useNativeDriver: true, easing: Easing.in(Easing.quad) }),
+        Animated.delay(700 - delay),
       ])
     );
-    Animated.parallel(anims.map((a, i) => loop(a, i * 180))).start();
+    Animated.parallel(anims.map((a, i) => loop(a, i * 150))).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <View style={S.msgRow}>
       <AIAvatar isGenerating={true} />
-      <View style={S.typingBubble}>
+      <View style={[S.typingBubble, { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#1E1F22', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.25)' }]}>
+        <Text style={{ color: '#9AA0A6', fontSize: 12, fontWeight: '600', marginRight: 4 }}>Moon Studio Thinking...</Text>
         {anims.map((a, i) => (
-          <Animated.View key={i} style={[S.typingDot, {
-            opacity: a.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] }),
-            transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.1] }) }],
-          }]} />
+          <Animated.View key={i} style={{
+            width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors[i],
+            opacity: a,
+            transform: [{ scale: a.interpolate({ inputRange: [0.2, 1], outputRange: [0.6, 1.3] }) }],
+          }} />
         ))}
       </View>
     </View>
@@ -193,6 +204,7 @@ const MessageBubble = memo(({ item, isGenerating }: { item: Message, isGeneratin
   
   useEffect(() => {
     Animated.spring(anim, { toValue: 1, useNativeDriver: true, tension: 65, friction: 11 }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -212,6 +224,21 @@ const MessageBubble = memo(({ item, isGenerating }: { item: Message, isGeneratin
           <AIAvatar isGenerating={isGenerating} />
           <View style={S.aiBubble}>
             <Text style={S.aiText}>{item.content}</Text>
+            {!!item.content && !isGenerating && (
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.surfaceHighlight, borderRadius: 12 }}
+                  onPress={() => {
+                    NativeModules.DeviceControl?.copyToClipboard?.(item.content);
+                    Alert.alert('Moon Studio', 'Response copied to clipboard.');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <CopyIcon color={C.textSecondary} size={14} />
+                  <Text style={{ fontSize: 11, color: C.textSecondary, fontWeight: '600' }}>Copy</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -222,100 +249,261 @@ const MessageBubble = memo(({ item, isGenerating }: { item: Message, isGeneratin
 });
 
 
-// ── AVAILABLE TOP MODELS ──────────────────────────────────────────────────
+// ── AVAILABLE TOP MODELS (Google Vertex Model Garden) ─────────────────────
 const AVAILABLE_MODELS = [
   {
     id: "llama32-1b",
     name: "Llama 3.2 1B",
-    desc: "Extremely fast, very capable. Perfect for older devices.",
+    desc: "Extremely fast, very capable. Perfect for older devices and rapid on-device prototyping.",
     url: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-    color: C.blue,
+    color: '#4285F4',
     size: "1.3 GB",
-    provider: "Meta"
+    provider: "Meta AI",
+    badge: "⚡ Ultralight",
+    tags: ["45+ TPS", "4-bit Quant", "Low RAM"]
   },
   {
     id: "qwen25-15b",
     name: "Qwen 2.5 1.5B",
-    desc: "Unbeatable reasoning for its size. Lightning fast.",
+    desc: "Unbeatable reasoning and math accuracy for its compact size. Lightning fast response time.",
     url: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-    color: C.purple,
+    color: '#A142F4',
     size: "1.1 GB",
-    provider: "Alibaba"
+    provider: "Alibaba",
+    badge: "🧠 Top Reasoning",
+    tags: ["50+ TPS", "Math & Logic", "Q4_K_M"]
   },
   {
     id: "llama32-3b",
     name: "Llama 3.2 3B",
-    desc: "The sweet spot of speed and immense intelligence.",
+    desc: "The sweet spot of general intelligence and generation speed for daily conversational tasks.",
     url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-    color: C.blue,
+    color: '#1A73E8',
     size: "2.1 GB",
-    provider: "Meta"
+    provider: "Meta AI",
+    badge: "🌟 Recommended",
+    tags: ["32 TPS", "High Accuracy", "3B Params"]
   },
   {
     id: "deepseek-15b",
     name: "DeepSeek R1 1.5B",
-    desc: "Distilled reasoning model. Thinks deeply.",
+    desc: "Distilled reasoning architecture. Formulates internal thought chains before answering.",
     url: "https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
-    color: C.orange,
+    color: '#FBBC04',
     size: "1.1 GB",
-    provider: "DeepSeek"
+    provider: "DeepSeek",
+    badge: "🔬 Deep Thought",
+    tags: ["CoT Reasoning", "Distilled", "1.5B"]
   },
   {
     id: "gemma2-2b",
     name: "Gemma 2 2B",
-    desc: "Google's lightweight but punchy architecture.",
+    desc: "Lightweight but punchy neural architecture designed for on-device semantic understanding.",
     url: "https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf",
-    color: C.green,
+    color: '#00F2FE',
     size: "1.6 GB",
-    provider: "Google"
+    provider: "Neural Arch",
+    badge: "✦ Quantum Core",
+    tags: ["Official Arch", "38 TPS", "2B Params"]
   },
   {
     id: "phi3-mini",
     name: "Phi-3 Mini 3.8B",
-    desc: "Microsoft's small model that hits way above its weight.",
+    desc: "Microsoft's small model that hits way above its weight class with rich contextual memory.",
     url: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
     color: '#00A4EF',
     size: "2.4 GB",
-    provider: "Microsoft"
+    provider: "Microsoft",
+    badge: "💼 Enterprise",
+    tags: ["4K Context", "Dense", "Q4 Quant"]
   },
   {
     id: "mistral-7b",
     name: "Mistral 7B (v0.3)",
-    desc: "Very large. Needs 8GB+ RAM to run well.",
+    desc: "Professional flagship 7B model. Requires 8GB+ RAM to run smoothly without paging.",
     url: "https://huggingface.co/MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
-    color: C.red,
+    color: '#EA4335',
     size: "4.4 GB",
-    provider: "Mistral AI"
+    provider: "Mistral AI",
+    badge: "🔥 Flagship 7B",
+    tags: ["High Capacity", "v0.3 Instruct", "8GB RAM"]
   },
 ];
 
-// ── Splash Screen (Boot Animation) ──────────────────────────────────────────
+// ── Splash Screen (Futuristic Boot Animation) ──────────────────────────────
 function SplashScreen() {
-  const pulse = useRef(new Animated.Value(0.8)).current;
+  const pulse = useRef(new Animated.Value(0.85)).current;
+  const rotate1 = useRef(new Animated.Value(0)).current;
+  const rotate2 = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
+  const [statusText, setStatusText] = useState('INITIALIZING NEURAL CORE');
+
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulse, { toValue: 1.1, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(pulse, { toValue: 0.9, duration: 1200, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ])
-      )
-    ]).start();
+    Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }).start();
+
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1.12, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.88, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+
+    Animated.loop(
+      Animated.timing(rotate1, { toValue: 1, duration: 7000, easing: Easing.linear, useNativeDriver: true })
+    ).start();
+
+    Animated.loop(
+      Animated.timing(rotate2, { toValue: 1, duration: 11000, easing: Easing.linear, useNativeDriver: true })
+    ).start();
+
+    const t1 = setTimeout(() => setStatusText('CALIBRATING LOCAL WEIGHTS'), 900);
+    const t2 = setTimeout(() => setStatusText('MOON STUDIO CORE ONLINE'), 1800);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const spin1 = rotate1.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const spin2 = rotate2.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
+
   return (
-    <View style={[S.screen, { alignItems: 'center', justifyContent: 'center' }]}>
-      <Animated.View style={{ opacity, transform: [{ scale: pulse }], alignItems: 'center' }}>
-        <LogoMark size={90} />
-        <Text style={{ color: C.textPrimary, fontSize: 32, fontWeight: '800', letterSpacing: -1, marginTop: 24 }}>Nexus</Text>
-        <Text style={{ color: C.accent, fontSize: 14, fontWeight: '600', marginTop: 8, letterSpacing: 2, textTransform: 'uppercase' }}>Awakening Core</Text>
+    <View style={[S.screen, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#070913', overflow: 'hidden' }]}>
+      {/* Ambient background glows */}
+      <View style={{
+        position: 'absolute', width: 320, height: 320, borderRadius: 160,
+        backgroundColor: 'rgba(99, 102, 241, 0.18)',
+        transform: [{ scale: 1.4 }], top: '20%',
+      }} />
+      <View style={{
+        position: 'absolute', width: 220, height: 220, borderRadius: 110,
+        backgroundColor: 'rgba(168, 85, 247, 0.15)',
+        transform: [{ scale: 1.2 }], bottom: '25%',
+      }} />
+
+      <Animated.View style={{ opacity, alignItems: 'center' }}>
+        {/* Kinetic Core Animation */}
+        <View style={{ width: 180, height: 180, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+          {/* Outer dashed spinning orbit */}
+          <Animated.View style={{
+            position: 'absolute', width: 170, height: 170, borderRadius: 85,
+            borderWidth: 1.5, borderColor: 'rgba(99, 102, 241, 0.4)',
+            borderStyle: 'dashed', transform: [{ rotate: spin1 }],
+          }} />
+
+          {/* Middle counter-spinning ring with orbital nodes */}
+          <Animated.View style={{
+            position: 'absolute', width: 130, height: 130, borderRadius: 65,
+            borderWidth: 1, borderColor: 'rgba(168, 85, 247, 0.5)',
+            transform: [{ rotate: spin2 }], alignItems: 'center', justifyContent: 'center',
+          }}>
+            <View style={{ position: 'absolute', top: -3, width: 6, height: 6, borderRadius: 3, backgroundColor: '#A855F7' }} />
+            <View style={{ position: 'absolute', bottom: -3, width: 6, height: 6, borderRadius: 3, backgroundColor: '#6366F1' }} />
+          </Animated.View>
+
+          {/* Central Core Emblem */}
+          <Animated.View style={{
+            transform: [{ scale: pulse }],
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <LogoMark size={76} />
+          </Animated.View>
+        </View>
+
+        {/* Title Typography */}
+        <Text style={{
+          color: '#F8FAFC', fontSize: 36, fontWeight: '900',
+          letterSpacing: 6, marginTop: 36, textTransform: 'uppercase',
+          textAlign: 'center', textShadowColor: 'rgba(99, 102, 241, 0.6)',
+          textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 16
+        }}>MOON STUDIO</Text>
+
+        <Text style={{
+          color: 'rgba(148, 163, 184, 0.8)', fontSize: 12, fontWeight: '600',
+          letterSpacing: 4, marginTop: 6, textTransform: 'uppercase'
+        }}>ON-DEVICE LUNAR NEURAL LAB</Text>
+
+        {/* Status indicator pill */}
+        <View style={{
+          marginTop: 48, flexDirection: 'row', alignItems: 'center', gap: 8,
+          backgroundColor: 'rgba(15, 23, 42, 0.8)', paddingHorizontal: 16, paddingVertical: 8,
+          borderRadius: 20, borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.3)'
+        }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.accent }} />
+          <Text style={{ color: C.accent, fontSize: 11, fontWeight: '700', letterSpacing: 1.5 }}>
+            {statusText}
+          </Text>
+        </View>
       </Animated.View>
     </View>
   );
 }
+
+// ── Google Vertex Model Garden Card ────────────────────────────────────────
+const VertexModelCard = memo(({ model, isSelected, onPress, index = 0 }: { model: any, isSelected: boolean, onPress: () => void, index?: number }) => {
+  const scale = useRef(new Animated.Value(0.92)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(index * 70),
+      Animated.parallel([
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 65, friction: 9 }),
+        Animated.timing(opacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      ]),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ scale }], marginBottom: 14 }}>
+      <TouchableOpacity 
+        activeOpacity={0.8}
+        onPress={onPress}
+        style={[
+          S.storeCard, 
+          { borderColor: isSelected ? '#4285F4' : 'rgba(255, 255, 255, 0.09)', borderWidth: isSelected ? 1.5 : 1, padding: 18 },
+          isSelected && { backgroundColor: '#1E293B', shadowColor: '#4285F4', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 }
+        ]}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100, backgroundColor: model.color + '20', borderWidth: 1, borderColor: model.color + '60', flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: model.color }} />
+              <Text style={{ color: model.color, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 }}>{model.provider.toUpperCase()}</Text>
+            </View>
+            {!!model.badge && (
+              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100, backgroundColor: 'rgba(255, 255, 255, 0.07)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)' }}>
+                <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '700' }}>{model.badge}</Text>
+              </View>
+            )}
+          </View>
+          <View style={{ backgroundColor: isSelected ? '#4285F4' : 'rgba(66, 133, 244, 0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+            <Text style={{ color: isSelected ? '#FFFFFF' : '#60A5FA', fontSize: 11, fontWeight: '800' }}>{model.size}</Text>
+          </View>
+        </View>
+
+        <View style={{ marginBottom: 12 }}>
+          <Text style={{ fontSize: 19, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.3, marginBottom: 5 }}>{model.name}</Text>
+          <Text style={{ fontSize: 13, color: '#94A3B8', lineHeight: 18 }} numberOfLines={2}>{model.desc}</Text>
+        </View>
+
+        {!!model.tags && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.06)' }}>
+            {model.tags.map((tag: string, tIdx: number) => (
+              <View key={tIdx} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(255, 255, 255, 0.04)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' }}>
+                <Text style={{ color: '#CBD5E1', fontSize: 11, fontWeight: '600' }}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
 
 // ── Animated Setup Screen (Model Store) ───────────────────────────────────
 function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownload, onCancel, onSettings }: any) {
@@ -332,6 +520,7 @@ function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownl
         Animated.timing(bgWave, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
       ])
     ).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -382,42 +571,28 @@ function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownl
     <View style={[S.setupScreen, { paddingTop: insets.top }]}>
       <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <LogoMark size={40} />
+          <LogoMark size={44} />
           <View>
-            <Text style={{ color: C.textPrimary, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>Model Store</Text>
-            <Text style={{ color: C.textSecondary, fontSize: 13 }}>Choose an AI engine to download</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: C.textPrimary, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>Model Store</Text>
+              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0, 242, 254, 0.2)', borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.5)' }}>
+                <Text style={{ color: '#00F2FE', fontSize: 10, fontWeight: '800' }}>MOON CORE</Text>
+              </View>
+            </View>
+            <Text style={{ color: C.textSecondary, fontSize: 13 }}>Moon Studio • On-Device Lunar Garden</Text>
           </View>
         </View>
       </View>
-      
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-        {AVAILABLE_MODELS.map((model, idx) => {
-          const isSelected = currentModelUrl === model.url;
-          return (
-            <TouchableOpacity 
-              key={model.id} 
-              activeOpacity={0.8}
-              onPress={() => onDownload(model.url)}
-              style={[
-                S.storeCard, 
-                isSelected && { borderColor: C.accent, backgroundColor: C.surfaceHighlight }
-              ]}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                <View style={[S.storeIconWrap, { borderColor: model.color + '40', backgroundColor: model.color + '15' }]}>
-                  <Text style={{ color: model.color, fontWeight: '800', fontSize: 18 }}>{model.provider[0]}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={S.storeCardTitle}>{model.name}</Text>
-                  <Text style={S.storeCardDesc} numberOfLines={2}>{model.desc}</Text>
-                </View>
-                <View style={S.downloadBadge}>
-                  <Text style={{ color: C.accent, fontSize: 12, fontWeight: '700' }}>{model.size}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+        {AVAILABLE_MODELS.map((model, idx) => (
+          <VertexModelCard
+            key={model.id}
+            model={model}
+            index={idx}
+            isSelected={currentModelUrl === model.url}
+            onPress={() => onDownload(model.url)}
+          />
+        ))}
 
         <TouchableOpacity style={S.customUrlBtn} onPress={onSettings} activeOpacity={0.7}>
           <Text style={S.customUrlBtnText}>Paste Custom HuggingFace URL</Text>
@@ -428,10 +603,41 @@ function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownl
 }
 
 // ── Chat Screen ───────────────────────────────────────────────────────────
-export function ChatScreen({ navigation }: Props) {
+export function ChatScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState(getSettings());
   const [isAppBooting, setIsAppBooting] = useState(true);
+  
+  const [voiceModeActive, setVoiceModeActive] = useState(false);
+
+  const startVoiceInput = async () => {
+    try {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        Alert.alert('Permission', 'Microphone permission is required for voice input.');
+        return;
+      }
+      setVoiceModeActive(true);
+      const result = await NativeModules.DeviceControl.startSpeechRecognition();
+      if (result && result.length > 0) {
+        setInputText('');
+        handleSendMessage(result);
+      }
+    } catch (e: any) {
+      console.log('Voice input result:', e?.message);
+    } finally {
+      setVoiceModeActive(false);
+    }
+  };
+
+  const showMemories = () => {
+    const mems = getMemoryContextString();
+    if (!mems) {
+      Alert.alert("Moon Core", "No memories stored yet.");
+      return;
+    }
+    Alert.alert("Moon Core", mems.replace('Here are some facts to remember about the user:\n', '').trim());
+  };
   const [modelReady, setModelReady] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -439,12 +645,35 @@ export function ChatScreen({ navigation }: Props) {
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<{ name: string; size: string; content: string; uri: string } | null>(null);
+
+  const handlePickFile = async () => {
+    try {
+      const file = await NativeModules.DeviceControl.pickFile();
+      if (file && file.content) {
+        setAttachedFile(file);
+      }
+    } catch (e: any) {
+      if (e?.message && !e.message.includes('cancelled')) {
+        Alert.alert('File Attachment Error', e.message);
+      }
+    }
+  };
   
   const llamaRef = useRef<LlamaContext | null>(null);
   const listRef = useRef<FlatList>(null);
   const sendScale = useRef(new Animated.Value(1)).current;
 
   const modelFilename = settings.modelUrl.split('/').pop()?.split('?')[0] || 'model.gguf';
+
+  useEffect(() => {
+    if (route?.params?.openModels) {
+      setShowModelModal(true);
+    }
+    if (route?.params?.initialPrompt) {
+      setInputText(route.params.initialPrompt);
+    }
+  }, [route?.params?.openModels, route?.params?.initialPrompt]);
 
   useEffect(() => {
     const unsub = navigation.addListener('focus', () => setSettings(getSettings()));
@@ -456,6 +685,7 @@ export function ChatScreen({ navigation }: Props) {
     if (saved) setMessages(JSON.parse(saved));
     checkAndInit();
     return () => { llamaRef.current?.release(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.modelUrl]);
 
   useEffect(() => {
@@ -517,8 +747,8 @@ export function ChatScreen({ navigation }: Props) {
         model: getModelPath(fileToLoad), 
         use_mlock: true, 
         n_ctx: 1024, 
-        n_gpu_layers: 1,
-        n_threads: 2, // Restrict threads so OS scheduler doesn't thrash (improves thermal throttling & speed)
+        n_gpu_layers: 4,
+        n_threads: 4, // 4 Efficiency/Performance threads for 2x faster local inference without overheating
       });
       setModelReady(true);
       if (messages.length === 0) {
@@ -533,33 +763,53 @@ export function ChatScreen({ navigation }: Props) {
     }
   };
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || isGenerating || !llamaRef.current) return;
+  const handleSendMessage = async (textOverride?: string) => {
+    const rawInput = (textOverride !== undefined ? textOverride : inputText).trim();
+    if ((!rawInput && !attachedFile) || isGenerating || !llamaRef.current) return;
+
+    let promptInput = rawInput;
+    let displayInput = rawInput;
+    if (attachedFile) {
+      promptInput = `[Attached Document: ${attachedFile.name} (${attachedFile.size})]\n${attachedFile.content}\n\nUser Question: ${rawInput || 'Please analyze this document.'}`;
+      displayInput = `📄 ${attachedFile.name}\n\n${rawInput || 'Please analyze this document.'}`;
+    }
+
     Animated.sequence([
       Animated.timing(sendScale, { toValue: 0.85, duration: 70, useNativeDriver: true }),
       Animated.spring(sendScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 }),
     ]).start();
 
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: inputText.trim() };
+    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: displayInput };
+    const memoryString = getMemoryContextString();
     let prompt = '';
     messages.forEach(m => {
-      if (m.role === 'system') prompt += `<|system|>\n${m.content}<|end|>\n`;
+      if (m.role === 'system') prompt += `<|system|>\n${m.content}${memoryString ? '\n\n' + memoryString : ''}<|end|>\n`;
       else if (m.role === 'user') prompt += `<|user|>\n${m.content}<|end|>\n`;
       else if (m.role === 'assistant') prompt += `<|assistant|>\n${m.content}<|end|>\n`;
     });
-    prompt += `<|user|>\n${userMsg.content}<|end|>\n<|assistant|>\n`;
+    prompt += `<|user|>\n${promptInput}<|end|>\n<|assistant|>\n`;
 
     const aid = (Date.now() + 1).toString();
     setMessages(prev => [...prev, userMsg, { id: aid, role: 'assistant', content: '' }]);
     setInputText('');
+    setAttachedFile(null);
     setIsGenerating(true);
 
     try {
+      let fullResponse = '';
       await llamaRef.current.completion(
         { prompt, n_predict: 512, temperature: settings.temperature, top_p: settings.top_p, top_k: settings.top_k, stop: ['<|end|>', '<|user|>'] },
-        data => setMessages(prev => prev.map(m => m.id === aid ? { ...m, content: m.content + data.token } : m))
+        data => {
+          fullResponse += data.token;
+          const displayContent = fullResponse.replace(/<MEMORY>.*?<\/MEMORY>/gi, '').trim();
+          setMessages(prev => prev.map(m => m.id === aid ? { ...m, content: displayContent } : m));
+        }
       );
-    } catch (e) { console.error(e); }
+      
+      const newMemories = parseMemoryActions(fullResponse);
+      newMemories.forEach(m => addMemory(m));
+
+      setIsGenerating(false); }
     finally { setIsGenerating(false); }
   };
 
@@ -583,14 +833,15 @@ export function ChatScreen({ navigation }: Props) {
     setModelReady(false); // trigger download/init flow
   };
 
+  const filteredMessages = useMemo(() => messages.filter(m => m.role !== 'system'), [messages]);
+
   const renderItem = useCallback(({ item, index }: { item: Message, index: number }) => {
-    if (item.role === 'system') return null;
-    const isLast = index === messages.length - 1;
+    const isLast = index === filteredMessages.length - 1;
     const isCurrentlyGenerating = isGenerating && item.role === 'assistant' && isLast;
     
     if (item.role === 'assistant' && item.content === '' && isGenerating) return <TypingIndicator />;
     return <MessageBubble item={item} isGenerating={isCurrentlyGenerating} />;
-  }, [messages, isGenerating]);
+  }, [filteredMessages, isGenerating]);
 
   if (isAppBooting) {
     return <SplashScreen />;
@@ -614,30 +865,38 @@ export function ChatScreen({ navigation }: Props) {
     return found ? found.name : url.split('/').pop()?.split('?')[0];
   };
 
+  const CoreIcon = () => (
+    <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(99, 102, 241, 0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(99, 102, 241, 0.4)' }}>
+      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: C.accent, shadowColor: C.accent, shadowOffset: {width:0, height:0}, shadowOpacity: 0.8, shadowRadius: 6, elevation: 4 }} />
+    </View>
+  );
+
   return (
     <View style={[S.screen, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={S.header}>
-        <TouchableOpacity style={S.headerBrand} onPress={() => setShowModelModal(true)} activeOpacity={0.7}>
-          <View style={S.headerLogoWrap}>
-            <View style={{ width: 18, height: 20, position: 'relative' }}>
-              <View style={{ position: 'absolute', left: 0, top: 0, width: 2, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', left: 2, top: 0, width: 12, height: 2, backgroundColor: C.accent, borderRadius: 1, transform: [{ rotate: '35deg' }, { translateY: 2 }] }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+          <TouchableOpacity style={S.headerBtn} onPress={() => navigation.navigate('Gallery')} activeOpacity={0.7}>
+            <ArrowLeftIcon />
+          </TouchableOpacity>
+          <TouchableOpacity style={S.headerBrand} onPress={() => setShowModelModal(true)} activeOpacity={0.7}>
+            <GoogleAIEmblem size={24} />
+            <View style={{ gap: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={S.headerBrandName}>Moon Studio Chat</Text>
+                <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.textSecondary, marginTop: 2 }} />
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={S.onlineDot} />
+                <Text style={S.headerStatus} numberOfLines={1}>{findModelName(settings.modelUrl)}</Text>
+              </View>
             </View>
-          </View>
-          <View style={{ gap: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={S.headerBrandName}>Nexus</Text>
-              <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.textSecondary, marginTop: 2 }} />
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <View style={S.onlineDot} />
-              <Text style={S.headerStatus} numberOfLines={1}>{findModelName(settings.modelUrl)}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        </View>
         <View style={S.headerActions}>
+          <TouchableOpacity style={S.headerBtn} onPress={showMemories} activeOpacity={0.6}>
+            <CoreIcon />
+          </TouchableOpacity>
           <TouchableOpacity style={S.headerBtn} onPress={clearChat} activeOpacity={0.6}>
             <ClearIcon />
           </TouchableOpacity>
@@ -652,7 +911,7 @@ export function ChatScreen({ navigation }: Props) {
       <KeyboardAvoidingView style={S.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <FlatList
           ref={listRef}
-          data={messages.filter(m => m.role !== 'system')}
+          data={filteredMessages}
           keyExtractor={item => item.id}
           renderItem={renderItem}
           contentContainerStyle={[S.chatContent, { flexGrow: 1 }]}
@@ -661,7 +920,8 @@ export function ChatScreen({ navigation }: Props) {
           initialNumToRender={15}
           maxToRenderPerBatch={10}
           windowSize={10}
-          removeClippedSubviews={true}
+          updateCellsBatchingPeriod={30}
+          removeClippedSubviews={Platform.OS === 'android'}
           ListEmptyComponent={
             <View style={S.emptyState}>
               <LogoMark size={48} />
@@ -678,18 +938,85 @@ export function ChatScreen({ navigation }: Props) {
           }
         />
 
+        {/* ── M3 Assist Chips (Horizontal Prompt Starters) ────────────────── */}
+        <View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 8 }}
+          >
+            {[
+              '✨ Summarize document',
+              '💡 Brainstorm architecture',
+              '📝 Refactor code',
+              '🌍 Translate audio',
+              '🔍 Debug JSDoc',
+            ].map(chip => (
+              <TouchableOpacity
+                key={chip}
+                style={{
+                  backgroundColor: C.surfaceHighlight,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: C.border,
+                }}
+                onPress={() => setInputText(chip + ':\n\n')}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: C.textPrimary }}>{chip}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* ── M3 Attached Document Card ───────────────────────────────────── */}
+        {attachedFile && (
+          <View style={{
+            marginHorizontal: 16, marginBottom: 8, padding: 10,
+            backgroundColor: C.blue + '15', borderRadius: 12, borderWidth: 1, borderColor: C.blue,
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+              <AttachmentIcon color={C.blue} size={18} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.textPrimary }} numberOfLines={1}>{attachedFile.name}</Text>
+                <Text style={{ fontSize: 11, color: C.blue }}>Attached Document • {attachedFile.size}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => setAttachedFile(null)} style={{ padding: 4 }}>
+              <Text style={{ color: C.textSecondary, fontSize: 14, fontWeight: '800' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Input */}
         <View style={[S.inputBar, { paddingBottom: insets.bottom + 10 }]}>
           <View style={S.inputWrap}>
+            <TouchableOpacity
+              onPress={handlePickFile}
+              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+              activeOpacity={0.7}
+            >
+              <AttachmentIcon color={C.textSecondary} size={20} />
+            </TouchableOpacity>
             <TextInput
               style={S.input}
-              placeholder="Message Nexus..."
+              placeholder={attachedFile ? "Ask about attached document..." : "Message Moon Studio..."}
               placeholderTextColor={C.textMuted}
               value={inputText}
               onChangeText={setInputText}
               multiline
               maxLength={2000}
             />
+            <TouchableOpacity
+              onPress={startVoiceInput}
+              style={[S.micBtn, voiceModeActive && S.micBtnActive]}
+              activeOpacity={0.7}
+            >
+              <MicIcon active={voiceModeActive} />
+            </TouchableOpacity>
           </View>
           <Animated.View style={{ transform: [{ scale: sendScale }] }}>
             {isGenerating ? (
@@ -698,12 +1025,12 @@ export function ChatScreen({ navigation }: Props) {
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[S.sendBtn, !inputText.trim() && S.sendBtnDim]}
-                onPress={sendMessage}
-                disabled={!inputText.trim()}
+                style={[S.sendBtn, (!inputText.trim() && !attachedFile) && S.sendBtnDim]}
+                onPress={() => handleSendMessage()}
+                disabled={!inputText.trim() && !attachedFile}
                 activeOpacity={0.85}
               >
-                <SendIcon />
+                <SendArrowIcon />
               </TouchableOpacity>
             )}
           </Animated.View>
@@ -723,23 +1050,14 @@ export function ChatScreen({ navigation }: Props) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
-              {AVAILABLE_MODELS.map((model) => (
-                <TouchableOpacity 
+              {AVAILABLE_MODELS.map((model, idx) => (
+                <VertexModelCard
                   key={model.id}
-                  style={[S.modelOption, settings.modelUrl === model.url && { borderColor: C.accent, backgroundColor: C.surfaceHighlight }]} 
+                  model={model}
+                  index={idx}
+                  isSelected={settings.modelUrl === model.url}
                   onPress={() => switchModel(model.url)}
-                >
-                  <View style={[S.modelOptionIcon, { backgroundColor: model.color + '20', borderColor: model.color + '50' }]}>
-                    <Text style={{ color: model.color, fontSize: 16, fontWeight: '700' }}>{model.provider[0]}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={S.modelOptionTitle}>{model.name}</Text>
-                    <Text style={S.modelOptionSub} numberOfLines={1}>{model.desc}</Text>
-                  </View>
-                  <View style={S.downloadBadge}>
-                    <Text style={{ color: C.accent, fontSize: 11, fontWeight: '700' }}>{model.size}</Text>
-                  </View>
-                </TouchableOpacity>
+                />
               ))}
 
               <TouchableOpacity style={S.modelOption} onPress={() => { setShowModelModal(false); navigation.navigate('Settings'); }}>
@@ -829,12 +1147,20 @@ const S = StyleSheet.create({
     backgroundColor: C.bg,
   },
   inputWrap: {
-    flex: 1, backgroundColor: C.surface, borderRadius: 20,
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.surface, borderRadius: 20,
     borderWidth: 1, borderColor: C.border,
-    paddingHorizontal: 15, paddingVertical: 6,
-    minHeight: 46, justifyContent: 'center',
+    paddingLeft: 15, paddingRight: 4,
+    minHeight: 46,
   },
-  input: { color: C.textPrimary, fontSize: 15, maxHeight: 130, paddingVertical: 4 },
+  input: { flex: 1, color: C.textPrimary, fontSize: 15, maxHeight: 130, paddingVertical: 4 },
+  micBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  micBtnActive: {
+    backgroundColor: C.accent + '30',
+  },
   sendBtn: {
     width: 44, height: 44, borderRadius: 13,
     backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', flexShrink: 0,

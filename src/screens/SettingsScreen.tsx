@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Animated, Easing, Alert,
+  Animated, Easing, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,21 +11,21 @@ import { getSettings, saveSettings, AppSettings, defaultSettings } from '../serv
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 const C = {
-  bg: '#080C14',
-  surface: '#0F1422',
-  surfaceHigh: '#141827',
-  border: '#1C2035',
-  borderHigh: '#252A40',
-  accent: '#7C5CFC',
-  accentDim: '#3D2E80',
-  textPrimary: '#E8E9F3',
-  textSecondary: '#6B7490',
-  textMuted: '#353A55',
-  green: '#34D399',
-  red: '#F87171',
-  purple: '#7C5CFC',
-  indigo: '#6366F1',
-  pink: '#EC4899',
+  bg: '#131314',
+  surface: '#1E1F22',
+  surfaceHigh: '#282A2F',
+  border: 'rgba(255, 255, 255, 0.08)',
+  borderHigh: 'rgba(255, 255, 255, 0.15)',
+  accent: '#4285F4',
+  accentDim: '#1A3B6E',
+  textPrimary: '#F2F2F2',
+  textSecondary: '#9AA0A6',
+  textMuted: '#5F6368',
+  green: '#34A853',
+  red: '#EA4335',
+  purple: '#A142F4',
+  indigo: '#4285F4',
+  pink: '#FF6D01',
 };
 
 // Back Icon
@@ -90,16 +90,6 @@ function SectionLabel({ label }: { label: string }) {
   return <Text style={styles.sectionLabel}>{label}</Text>;
 }
 
-// Row field
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.fieldRow}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      {children}
-    </View>
-  );
-}
-
 // Param row
 function ParamItem({ label, desc, value, min, max, step, color, onChange }: {
   label: string; desc: string; value: number; min: number; max: number;
@@ -133,6 +123,7 @@ export function SettingsScreen({ navigation }: Props) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 450, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 70, friction: 12 }),
     ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!settings) return null;
@@ -242,7 +233,7 @@ export function SettingsScreen({ navigation }: Props) {
               <View style={{ position: 'absolute', left: 2, top: 0, width: 11, height: 2, backgroundColor: C.accent, borderRadius: 1, transform: [{ rotate: '36deg' }, { translateY: 1 }] }} />
             </View>
           </View>
-          <Text style={styles.aboutName}>Nexus</Text>
+          <Text style={styles.aboutName}>Moon Studio</Text>
           <Text style={styles.aboutSub}>Private AI · On-device · llama.cpp</Text>
         </View>
       </Animated.ScrollView>

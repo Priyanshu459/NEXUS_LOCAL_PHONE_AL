@@ -1,6 +1,9 @@
 import { createMMKV } from 'react-native-mmkv';
 
-export const storage = createMMKV({ id: 'app-storage' });
+export const storage = createMMKV({ 
+  id: 'moon-studio-storage',
+  encryptionKey: 'moon-studio-secure-vault-on-device' 
+});
 
 export const SETTINGS_KEY = 'app_settings';
 export const CHAT_HISTORY_KEY = 'chat_history';
