@@ -602,6 +602,98 @@ function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownl
   );
 }
 
+// ── Standalone Memoized Chat Input Bar (Eliminates Keyboard Lag & Screen Re-renders) ──
+const ChatInputBar = memo(({
+  onSend,
+  onStop,
+  isGenerating,
+  attachedFile,
+  onPickFile,
+  onVoiceInput,
+  voiceModeActive,
+  insetsBottom,
+  externalPrompt,
+  onClearExternalPrompt,
+}: {
+  onSend: (text?: string) => void;
+  onStop: () => void;
+  isGenerating: boolean;
+  attachedFile: any;
+  onPickFile: () => void;
+  onVoiceInput: () => void;
+  voiceModeActive: boolean;
+  insetsBottom: number;
+  externalPrompt: string;
+  onClearExternalPrompt: () => void;
+}) => {
+  const [localText, setLocalText] = useState('');
+  const sendScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (externalPrompt) {
+      setLocalText(externalPrompt);
+      onClearExternalPrompt();
+    }
+  }, [externalPrompt, onClearExternalPrompt]);
+
+  const handlePressSend = () => {
+    const trimmed = localText.trim();
+    if ((!trimmed && !attachedFile) || isGenerating) return;
+    Animated.sequence([
+      Animated.timing(sendScale, { toValue: 0.85, duration: 70, useNativeDriver: true }),
+      Animated.spring(sendScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 }),
+    ]).start();
+    onSend(trimmed);
+    setLocalText('');
+  };
+
+  return (
+    <View style={[S.inputBar, { paddingBottom: insetsBottom + 10 }]}>
+      <View style={S.inputWrap}>
+        <TouchableOpacity
+          onPress={onPickFile}
+          style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
+          activeOpacity={0.7}
+        >
+          <AttachmentIcon color={C.textSecondary} size={20} />
+        </TouchableOpacity>
+        <TextInput
+          style={S.input}
+          placeholder={attachedFile ? "Ask about attached document..." : "Message Moon Studio..."}
+          placeholderTextColor={C.textMuted}
+          value={localText}
+          onChangeText={setLocalText}
+          multiline
+          maxLength={2000}
+        />
+        <TouchableOpacity
+          onPress={onVoiceInput}
+          style={[S.micBtn, voiceModeActive && S.micBtnActive]}
+          activeOpacity={0.7}
+        >
+          <MicIcon active={voiceModeActive} />
+        </TouchableOpacity>
+      </View>
+      <Animated.View style={{ transform: [{ scale: sendScale }] }}>
+        {isGenerating ? (
+          <TouchableOpacity style={S.stopBtn} onPress={onStop} activeOpacity={0.85}>
+            <StopIcon />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[S.sendBtn, (!localText.trim() && !attachedFile) && S.sendBtnDim]}
+            onPress={handlePressSend}
+            disabled={!localText.trim() && !attachedFile}
+            activeOpacity={0.85}
+          >
+            <SendArrowIcon />
+          </TouchableOpacity>
+        )}
+      </Animated.View>
+    </View>
+  );
+});
+
 // ── Chat Screen ───────────────────────────────────────────────────────────
 export function ChatScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
@@ -662,7 +754,6 @@ export function ChatScreen({ navigation, route }: Props) {
   
   const llamaRef = useRef<LlamaContext | null>(null);
   const listRef = useRef<FlatList>(null);
-  const sendScale = useRef(new Animated.Value(1)).current;
 
   const modelFilename = settings.modelUrl.split('/').pop()?.split('?')[0] || 'model.gguf';
 
@@ -683,14 +774,24 @@ export function ChatScreen({ navigation, route }: Props) {
   useEffect(() => {
     const saved = storage.getString(CHAT_HISTORY_KEY);
     if (saved) setMessages(JSON.parse(saved));
-    checkAndInit();
-    return () => { llamaRef.current?.release(); };
+    const initTimer = setTimeout(() => {
+      checkAndInit();
+    }, 600);
+    return () => { 
+      clearTimeout(initTimer);
+      llamaRef.current?.release(); 
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.modelUrl]);
 
   useEffect(() => {
-    if (messages.length > 0) storage.set(CHAT_HISTORY_KEY, JSON.stringify(messages));
-  }, [messages]);
+    if (messages.length > 0 && !isGenerating) {
+      const timer = setTimeout(() => {
+        storage.set(CHAT_HISTORY_KEY, JSON.stringify(messages));
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, isGenerating]);
 
   const checkAndInit = async () => {
     try {
@@ -745,9 +846,9 @@ export function ChatScreen({ navigation, route }: Props) {
       // Extremely optimized parameters for mobile RAM (1024 ctx, tuned threads)
       llamaRef.current = await initLlama({
         model: getModelPath(fileToLoad), 
-        use_mlock: true, 
+        use_mlock: false, 
         n_ctx: 1024, 
-        n_gpu_layers: 4,
+        n_gpu_layers: 0,
         n_threads: 4, // 4 Efficiency/Performance threads for 2x faster local inference without overheating
       });
       setModelReady(true);
@@ -773,11 +874,6 @@ export function ChatScreen({ navigation, route }: Props) {
       promptInput = `[Attached Document: ${attachedFile.name} (${attachedFile.size})]\n${attachedFile.content}\n\nUser Question: ${rawInput || 'Please analyze this document.'}`;
       displayInput = `📄 ${attachedFile.name}\n\n${rawInput || 'Please analyze this document.'}`;
     }
-
-    Animated.sequence([
-      Animated.timing(sendScale, { toValue: 0.85, duration: 70, useNativeDriver: true }),
-      Animated.spring(sendScale, { toValue: 1, useNativeDriver: true, tension: 300, friction: 8 }),
-    ]).start();
 
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: displayInput };
     const memoryString = getMemoryContextString();
@@ -908,7 +1004,7 @@ export function ChatScreen({ navigation, route }: Props) {
 
       <View style={S.divider} />
 
-      <KeyboardAvoidingView style={S.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <KeyboardAvoidingView style={S.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <FlatList
           ref={listRef}
           data={filteredMessages}
@@ -992,49 +1088,18 @@ export function ChatScreen({ navigation, route }: Props) {
         )}
 
         {/* Input */}
-        <View style={[S.inputBar, { paddingBottom: insets.bottom + 10 }]}>
-          <View style={S.inputWrap}>
-            <TouchableOpacity
-              onPress={handlePickFile}
-              style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
-              activeOpacity={0.7}
-            >
-              <AttachmentIcon color={C.textSecondary} size={20} />
-            </TouchableOpacity>
-            <TextInput
-              style={S.input}
-              placeholder={attachedFile ? "Ask about attached document..." : "Message Moon Studio..."}
-              placeholderTextColor={C.textMuted}
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              maxLength={2000}
-            />
-            <TouchableOpacity
-              onPress={startVoiceInput}
-              style={[S.micBtn, voiceModeActive && S.micBtnActive]}
-              activeOpacity={0.7}
-            >
-              <MicIcon active={voiceModeActive} />
-            </TouchableOpacity>
-          </View>
-          <Animated.View style={{ transform: [{ scale: sendScale }] }}>
-            {isGenerating ? (
-              <TouchableOpacity style={S.stopBtn} onPress={stopGeneration} activeOpacity={0.85}>
-                <StopIcon />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[S.sendBtn, (!inputText.trim() && !attachedFile) && S.sendBtnDim]}
-                onPress={() => handleSendMessage()}
-                disabled={!inputText.trim() && !attachedFile}
-                activeOpacity={0.85}
-              >
-                <SendArrowIcon />
-              </TouchableOpacity>
-            )}
-          </Animated.View>
-        </View>
+        <ChatInputBar
+          onSend={handleSendMessage}
+          onStop={stopGeneration}
+          isGenerating={isGenerating}
+          attachedFile={attachedFile}
+          onPickFile={handlePickFile}
+          onVoiceInput={startVoiceInput}
+          voiceModeActive={voiceModeActive}
+          insetsBottom={insets.bottom}
+          externalPrompt={inputText}
+          onClearExternalPrompt={() => setInputText('')}
+        />
       </KeyboardAvoidingView>
 
       {/* ── Model Selector Modal ────────────────────────────────────────── */}
