@@ -1004,7 +1004,7 @@ export function ChatScreen({ navigation, route }: Props) {
 
       <View style={S.divider} />
 
-      <KeyboardAvoidingView style={S.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={S.flex} behavior="padding">
         <FlatList
           ref={listRef}
           data={filteredMessages}
