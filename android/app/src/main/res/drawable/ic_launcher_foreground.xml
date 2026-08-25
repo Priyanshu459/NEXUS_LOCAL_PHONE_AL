@@ -1,43 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Moonlight AI — Adaptive icon foreground (Android 8.0+)
-  Source: moonlight-icon.png from official brand assets
-  The foreground contains the moon mark centered in the 108dp canvas.
-  Background: @color/ic_launcher_background (white #FFFFFF)
-
-  This vector reproduces the stroke-style crescent from the official brand image:
-    - Bold stroke ring forming a crescent (open toward upper-right)
-    - Rounded arc ends
-    - Near-black fill (#0A0B0E) on white background
-    - Crescent centered in the 72dp safe zone (18dp inset each side)
-
-  Geometry: crescent stroke = outer ring arc with inner concave cutout
-  Outer arc: large circle arc spanning ~250° (opens ~40° upper-right)
-  Inner arc: concave inner face of the crescent
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!--
-      Moon crescent drawn as a filled path.
-      Center: (54, 54) — geometric center of 108dp adaptive canvas
-      The crescent fills the 72dp safe zone with ~8dp breathing room.
-
-      Path construction:
-        Outer arc:  radius=28, from 230° to 480° (250° sweep CW in screen coords)
-        Inner concave arc: radius=17, same center but offset cutout creates the hollow interior
-        The gap (upper-right) is shaped by the inner offset circle intersection
-
-      This is the same geometry as the SVG from Website_for_Moon, adapted for the
-      bolder stroke style of the official brand image at moonlight-icon.png.
-    -->
-
-    <!-- Outer moon ring arc — upper portion (top tip through left around to bottom) -->
+    <!-- Outer moon ring arc -->
     <path
-        android:fillColor="#0A0B0E"
+        android:fillColor="#FFFFFF"
         android:pathData="
           M 54,26
           A 28,28 0 1 0 82,54
@@ -49,13 +19,9 @@
           Z
         "/>
 
-    <!--
-      Crescent cutout — removes the upper-right sector to open the crescent.
-      A white filled shape cuts the ring to leave only the crescent arc.
-      This circle is centered offset upper-right: (68, 40), radius 20.
-    -->
+    <!-- Crescent cutout (matches background color) -->
     <path
-        android:fillColor="#FFFFFF"
+        android:fillColor="#0F1014"
         android:pathData="
           M 68,20
           A 20,20 0 1 0 68,60

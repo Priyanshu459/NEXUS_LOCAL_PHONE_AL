@@ -2,8 +2,8 @@
 <!--
   Moonlight AI brand colors
   ic_launcher_background: white — matches the canonical SVG white circle field
-  Source: C:\Dev\Website_for_Moon\moonlight-website\src\app\icon.svg (circle fill="#ffffff")
+  Source: C:\Dev\Website_for_Moon\moonlight-website\src\app\icon.svg (circle fill="#0F1014")
 -->
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#0F1014</color>
 </resources>
