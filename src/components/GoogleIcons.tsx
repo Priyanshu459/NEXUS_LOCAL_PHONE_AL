@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
-import { MoonBrandDarkBase64 } from '../assets/branding/BrandAssets';
 
-// Nexus AI Studio Dark & Neon Theme Colors
+// Moonlight AI dark theme colors
 export const GColor = {
   bg: '#131314',
   surface: '#1E1F22',
@@ -27,20 +26,18 @@ export const GColor = {
   indigo: '#3B82F6',
 };
 
-// Moon Studio Official Emblem
-export function NexusAIEmblem({ size = 24 }: { size?: number }) {
+// Moonlight AI official website emblem
+export function MoonlightAIEmblem({ size = 24 }: { size?: number }) {
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', borderRadius: size / 2, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.4)', shadowColor: '#00F2FE', shadowOpacity: 0.6, shadowRadius: 6, elevation: 4 }}>
-      <Image 
-        source={{ uri: MoonBrandDarkBase64 }} 
-        style={{ width: size, height: size }} 
-        resizeMode="contain" 
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', borderRadius: size / 2, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.16)' }}>
+      <Image
+        source={require('../assets/moon_icon.png')}
+        style={{ width: size, height: size }}
+        resizeMode="contain"
       />
     </View>
   );
 }
-export const GoogleAIEmblem = NexusAIEmblem;
-
 // Hamburger Menu Icon
 export function MenuIcon({ size = 24, color = GColor.textPrimary }: { size?: number; color?: string }) {
   return (
@@ -74,7 +71,7 @@ export function SendArrowIcon({ size = 18, color = '#FFFFFF' }: { size?: number;
   );
 }
 
-// Nexus AI Studio Sparkles Icon
+// Moonlight AI sparkles icon
 export function SparklesIcon({ size = 20 }: { size?: number }) {
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', position: 'relative' }}>

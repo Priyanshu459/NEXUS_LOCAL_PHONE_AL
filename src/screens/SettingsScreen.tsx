@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Animated, Easing, Alert, Switch,
+  Animated, Easing, Alert, Switch, Modal, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { getSettings, saveSettings, AppSettings, defaultSettings } from '../services/storage';
+import { getMemories, deleteMemory, memoryStorage, Fact } from '../services/MemoryManager';
+import MoonLogo from '../components/MoonLogo';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -117,14 +119,16 @@ export function SettingsScreen({ navigation }: Props) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
 
+  const [memoryModalVisible, setMemoryModalVisible] = useState(false);
+  const [memories, setMemories] = useState<Fact[]>([]);
+
   useEffect(() => {
     setSettings(getSettings());
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 450, useNativeDriver: true, easing: Easing.out(Easing.quad) }),
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 70, friction: 12 }),
     ]).start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fadeAnim, slideAnim]);
 
   if (!settings) return null;
 
@@ -142,6 +146,50 @@ export function SettingsScreen({ navigation }: Props) {
         onPress: () => { setSettings(defaultSettings); saveSettings(defaultSettings); },
       },
     ]);
+
+  const openMemoryModal = () => {
+    setMemories(getMemories());
+    setMemoryModalVisible(true);
+  };
+
+  const handleDeleteMemory = (id: string) => {
+    deleteMemory(id);
+    setMemories(getMemories());
+  };
+
+  const handleClearAllMemories = () => {
+    Alert.alert('Clear All Memories', 'Are you sure you want to delete all saved memories? This will not affect your chat history or downloaded models.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: () => {
+          memoryStorage.set('memories', JSON.stringify([]));
+          setMemories([]);
+      }}
+    ]);
+  };
+
+  // Response Style Logic
+  const getStylePreset = () => {
+    const { temperature: t, top_p: p, top_k: k } = settings;
+    if (t === 0.2 && p === 0.9 && k === 20) return 'Precise';
+    if (t === 0.7 && p === 0.95 && k === 40) return 'Balanced';
+    if (t === 1.2 && p === 0.98 && k === 60) return 'Creative';
+    return 'Custom';
+  };
+
+  const currentStyle = getStylePreset();
+
+  const setPreset = (preset: 'Precise' | 'Balanced' | 'Creative') => {
+    let next = { ...settings };
+    if (preset === 'Precise') {
+      next.temperature = 0.2; next.top_p = 0.9; next.top_k = 20;
+    } else if (preset === 'Balanced') {
+      next.temperature = 0.7; next.top_p = 0.95; next.top_k = 40;
+    } else if (preset === 'Creative') {
+      next.temperature = 1.2; next.top_p = 0.98; next.top_k = 60;
+    }
+    setSettings(next);
+    saveSettings(next);
+  };
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -164,7 +212,7 @@ export function SettingsScreen({ navigation }: Props) {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Model ──────────────────────────────── */}
+        {/* 1. Model */}
         <SectionLabel label="Model" />
         <View style={styles.card}>
           <Text style={styles.cardFieldLabel}>Download URL</Text>
@@ -182,28 +230,71 @@ export function SettingsScreen({ navigation }: Props) {
           </View>
           <View style={styles.hintRow}>
             <View style={styles.hintDotWrap} />
-          <Text style={styles.hintText}>Use a direct quantized .gguf URL. Changing it requires a new download.</Text>
+            <Text style={styles.hintText}>Use a direct quantized .gguf URL. Changing it requires a new download.</Text>
           </View>
         </View>
 
-        {/* ── Persona ─────────────────────────────── */}
-        <SectionLabel label="System Persona" />
+        {/* 2. Response Style */}
+        <SectionLabel label="Response Style" />
         <View style={styles.card}>
-          <Text style={styles.cardFieldLabel}>Instructions for the AI</Text>
-          <TextInput
-            style={styles.promptField}
-            value={settings.systemPrompt}
-            onChangeText={t => update('systemPrompt', t)}
-            multiline
-            textAlignVertical="top"
-            placeholder="You are a helpful assistant..."
-            placeholderTextColor={C.textMuted}
-          />
-          <Text style={styles.charCount}>{settings.systemPrompt.length} chars</Text>
+          <View style={{ flexDirection: 'row', backgroundColor: C.bg, borderRadius: 12, padding: 4, borderWidth: 1, borderColor: C.border }}>
+            {['Precise', 'Balanced', 'Creative'].map((preset) => (
+              <TouchableOpacity
+                key={preset}
+                style={[styles.segmentBtn, currentStyle === preset && styles.segmentBtnActive]}
+                onPress={() => setPreset(preset as any)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.segmentBtnText, currentStyle === preset && styles.segmentBtnTextActive]}>{preset}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {currentStyle === 'Custom' && (
+            <Text style={{ color: C.textSecondary, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+              Currently using <Text style={{ color: C.accent, fontWeight: '700' }}>Custom</Text> advanced settings.
+            </Text>
+          )}
         </View>
 
-        {/* ── Sampling ────────────────────────────── */}
-        <SectionLabel label="Generation" />
+        {/* 3. Memory */}
+        <SectionLabel label="Memory" />
+        <View style={styles.card}>
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={styles.paramLabel}>Enable Memory</Text>
+              <Text style={styles.paramDesc}>Allow the assistant to reuse facts it explicitly saves from chat.</Text>
+            </View>
+            <Switch
+              value={settings.memoryEnabled}
+              onValueChange={v => update('memoryEnabled', v)}
+              trackColor={{ false: C.surfaceHigh, true: C.accentDim }}
+              thumbColor={settings.memoryEnabled ? C.accent : C.textSecondary}
+            />
+          </View>
+          <View style={styles.paramDivider} />
+          <TouchableOpacity style={styles.manageMemoryBtn} onPress={openMemoryModal} activeOpacity={0.7}>
+            <Text style={styles.manageMemoryBtnText}>View & Manage Saved Memories</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 4. Privacy and storage */}
+        <SectionLabel label="Privacy and Storage" />
+        <View style={styles.card}>
+          <Text style={styles.privacyText}>
+            Moonlight AI is designed as a private, local-first Android AI assistant. Chats, settings, downloaded models, and saved memories are stored on this device. Internet access is used for model downloads. Chat inference does not use external cloud AI APIs after a compatible model is installed. File attachments read selected text into the current chat only. Moonlight AI does not include accounts, ad SDKs, or analytics SDKs.
+          </Text>
+        </View>
+
+        {/* 5. Voice Input */}
+        <SectionLabel label="Voice Input" />
+        <View style={styles.card}>
+          <Text style={styles.privacyText}>
+            Voice input uses Android's speech recognition service. Depending on your device and settings, speech recognition may use network processing.
+          </Text>
+        </View>
+
+        {/* 6. Advanced generation controls */}
+        <SectionLabel label="Advanced Generation Controls" />
         <View style={[styles.card, { gap: 0 }]}>
           <ParamItem
             label="Temperature" desc="Randomness of output"
@@ -224,39 +315,50 @@ export function SettingsScreen({ navigation }: Props) {
           />
         </View>
 
-        <SectionLabel label="Memory And Privacy" />
-        <View style={styles.card}>
-          <View style={styles.toggleRow}>
-            <View style={{ flex: 1, gap: 3 }}>
-              <Text style={styles.paramLabel}>Memory</Text>
-              <Text style={styles.paramDesc}>Allow the assistant to reuse facts it explicitly saves from chat.</Text>
-            </View>
-            <Switch
-              value={settings.memoryEnabled}
-              onValueChange={v => update('memoryEnabled', v)}
-              trackColor={{ false: C.surfaceHigh, true: C.accentDim }}
-              thumbColor={settings.memoryEnabled ? C.accent : C.textSecondary}
-            />
-          </View>
-          <View style={styles.paramDivider} />
-          <Text style={styles.privacyText}>
-            Chats, settings, downloaded models, and saved memories are stored on this device. Local model inference runs on device after a model is downloaded. Voice input uses the operating system speech recognizer, which may use network services depending on device settings. File attachments read selected text into the current chat only.
-          </Text>
-        </View>
-
-        {/* ── About ───────────────────────────────── */}
+        {/* 7. About */}
         <View style={styles.about}>
-          <View style={styles.aboutLogo}>
-            <View style={{ width: 16, height: 18, position: 'relative' }}>
-              <View style={{ position: 'absolute', left: 0, top: 0, width: 2, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', right: 0, top: 0, width: 2, height: '100%', backgroundColor: C.accent, borderRadius: 1 }} />
-              <View style={{ position: 'absolute', left: 2, top: 0, width: 11, height: 2, backgroundColor: C.accent, borderRadius: 1, transform: [{ rotate: '36deg' }, { translateY: 1 }] }} />
-            </View>
-          </View>
+          <MoonLogo size={40} variant="light" />
           <Text style={styles.aboutName}>Moonlight AI</Text>
-          <Text style={styles.aboutSub}>Local model runtime · llama.cpp</Text>
+          <Text style={styles.aboutSub}>Private AI for Android</Text>
         </View>
       </Animated.ScrollView>
+
+      {/* Memory Management Modal */}
+      <Modal visible={memoryModalVisible} animationType="slide" transparent={true} onRequestClose={() => setMemoryModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Saved Memories</Text>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setMemoryModalVisible(false)}>
+                <Text style={{ color: C.textSecondary, fontWeight: '700', fontSize: 16 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }} contentContainerStyle={{ padding: 20, gap: 12 }}>
+              {memories.length === 0 ? (
+                <Text style={{ color: C.textMuted, textAlign: 'center', paddingVertical: 20 }}>No memories saved yet.</Text>
+              ) : (
+                memories.map((m) => (
+                  <View key={m.id} style={styles.memoryItem}>
+                    <Text style={styles.memoryText}>{m.content}</Text>
+                    <TouchableOpacity onPress={() => handleDeleteMemory(m.id)} style={styles.memoryDeleteBtn}>
+                      <Text style={{ color: C.red, fontSize: 12, fontWeight: '700' }}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            {memories.length > 0 && (
+              <View style={{ padding: 20, borderTopWidth: 1, borderColor: C.border }}>
+                <TouchableOpacity style={styles.clearMemoriesBtn} onPress={handleClearAllMemories}>
+                  <Text style={styles.clearMemoriesBtnText}>Clear All Memories</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -342,4 +444,40 @@ const styles = StyleSheet.create({
   },
   aboutName: { fontSize: 14, fontWeight: '700', color: C.textMuted },
   aboutSub: { fontSize: 11, color: C.textMuted },
+
+  segmentBtn: {
+    flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8,
+  },
+  segmentBtnActive: {
+    backgroundColor: C.surfaceHigh,
+  },
+  segmentBtnText: {
+    color: C.textMuted, fontSize: 12, fontWeight: '600',
+  },
+  segmentBtnTextActive: {
+    color: C.textPrimary,
+  },
+  manageMemoryBtn: {
+    paddingVertical: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: C.surfaceHigh, borderRadius: 10,
+  },
+  manageMemoryBtnText: {
+    color: C.accent, fontSize: 13, fontWeight: '600',
+  },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: {
+    backgroundColor: C.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  modalHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginTop: 12, marginBottom: 8 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1, borderColor: C.border },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: C.textPrimary },
+  modalCloseBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.surfaceHigh, alignItems: 'center', justifyContent: 'center' },
+  memoryItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, backgroundColor: C.bg, borderRadius: 12, borderWidth: 1, borderColor: C.border },
+  memoryText: { color: C.textPrimary, fontSize: 13, flex: 1, marginRight: 12, lineHeight: 18 },
+  memoryDeleteBtn: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: 'rgba(255, 90, 122, 0.1)', borderRadius: 8 },
+  clearMemoriesBtn: { backgroundColor: 'rgba(255, 90, 122, 0.1)', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  clearMemoriesBtnText: { color: C.red, fontSize: 14, fontWeight: '700' },
 });

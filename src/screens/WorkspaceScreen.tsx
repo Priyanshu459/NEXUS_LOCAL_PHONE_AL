@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Platform, StatusBar, Alert,
+  StatusBar,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
 import {
-  GColor, MenuIcon, SparkleFourColorIcon,
+  GColor, MenuIcon,
 } from '../components/GoogleIcons';
 import MoonLogo from '../components/MoonLogo';
 import { getSettings } from '../services/storage';
+import { DOCK_RESERVED_SPACE } from '../constants/layout';
 
 
 
@@ -56,7 +55,7 @@ export function WorkspaceScreen({ navigation }: any) {
             activeOpacity={0.7}
           >
             <View style={[S.dot, { backgroundColor: GColor.green }]} />
-            <Text style={S.telemetryBtnText}>Runtime</Text>
+            <Text style={S.telemetryBtnText}>Status</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={S.iconBtn}
@@ -69,12 +68,12 @@ export function WorkspaceScreen({ navigation }: any) {
       </View>
 
       {/* ── Developer Telemetry Overlay ───────────────────────────────────── */}
-      {showTelemetry && (
+      {__DEV__ && showTelemetry && (
         <View style={S.telemetryCard}>
           <View style={S.telemetryHeader}>
-            <Text style={S.telemetryTitle}>Runtime Status</Text>
+            <Text style={S.telemetryTitle}>Local Status</Text>
             <TouchableOpacity onPress={() => setShowTelemetry(false)}>
-              <Text style={{ color: GColor.textSecondary, fontWeight: '700' }}>✕</Text>
+              <Text style={{ color: GColor.textMuted, fontSize: 20 }}>×</Text>
             </TouchableOpacity>
           </View>
           <View style={S.telemetryGrid}>
@@ -84,7 +83,7 @@ export function WorkspaceScreen({ navigation }: any) {
             </View>
             <View style={S.telemetryItem}>
               <Text style={S.telemetryLabel}>Acceleration</Text>
-              <Text style={[S.telemetryVal, { color: GColor.green }]}>Device optimized</Text>
+              <Text style={[S.telemetryVal, { color: GColor.green }]}>CPU local runtime</Text>
             </View>
             <View style={S.telemetryItem}>
               <Text style={S.telemetryLabel}>RAM Allocation</Text>
@@ -93,7 +92,7 @@ export function WorkspaceScreen({ navigation }: any) {
             <View style={S.telemetryItem}>
               <Text style={S.telemetryLabel}>Loaded Model</Text>
               <Text style={S.telemetryVal} numberOfLines={1}>
-                {settings.modelUrl.split('/').pop()?.split('?')[0] || 'Llama-3.2-1B.gguf'}
+                {settings.modelUrl ? settings.modelUrl.split('/').pop() : 'None'}
               </Text>
             </View>
           </View>
@@ -103,14 +102,14 @@ export function WorkspaceScreen({ navigation }: any) {
       {/* ── Main Tab Content ──────────────────────────────────────────────── */}
       <ScrollView
         style={S.content}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 88, paddingHorizontal: 16 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + DOCK_RESERVED_SPACE, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ gap: 20, marginTop: 12 }}>
+        <View style={{ gap: 20, marginTop: 16 }}>
           {/* Hero Welcome Banner */}
           <View style={S.heroCard}>
             <View style={S.heroTopRow}>
-              <SparkleFourColorIcon size={28} />
+              <MoonLogo size={32} variant="light" />
               <View style={S.heroStatusPill}>
                 <View style={[S.dot, { backgroundColor: GColor.blue }]} />
                 <Text style={S.heroStatusText}>Local chat after setup</Text>

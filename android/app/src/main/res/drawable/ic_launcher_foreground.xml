@@ -5,28 +5,17 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Outer moon ring arc -->
+    <!-- Official Moonlight AI website icon. -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="
-          M 54,26
-          A 28,28 0 1 0 82,54
-          A 28,28 0 0 0 54,26
-          Z
-          M 54,36
-          A 18,18 0 1 1 72,54
-          A 18,18 0 0 1 54,36
-          Z
-        "/>
+        android:pathData="M54,11a43,43 0,1 0,0,86a43,43 0,1 0,0,-86"/>
 
-    <!-- Crescent cutout (matches background color) -->
     <path
-        android:fillColor="#0F1014"
-        android:pathData="
-          M 68,20
-          A 20,20 0 1 0 68,60
-          A 20,20 0 1 0 68,20
-          Z
-        "/>
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#0A0B0E"
+        android:strokeWidth="4.22"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M67.09,39.88a13.37,13.37 0,1 1,-14.07 -14.06c0.6,-0.04 0.92,0.69 0.6,1.2a8.91,8.91 0,0 0,12.28 12.28c0.51,-0.32 1.22,-0.01 1.2,0.6"/>
 
 </vector>

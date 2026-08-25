@@ -12,7 +12,7 @@
  *
  * Design rules:
  *   - Dark background (#0F1014) matching the app's primary surface
- *   - White crescent on dark bg (moonlight-icon-light.png)
+ *   - Official website moon icon
  *   - No additional decorations, text, or particles
  *   - Logo is centered both vertically and horizontally
  *   - Premium startup-grade feel
@@ -22,11 +22,12 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
-  Image,
   StatusBar,
   StyleSheet,
   View,
+  Text,
 } from 'react-native';
+import MoonLogo from './MoonLogo';
 
 interface MoonlightSplashProps {
   onFinish: () => void;
@@ -97,11 +98,10 @@ const MoonlightSplash: React.FC<MoonlightSplashProps> = ({ onFinish }) => {
           styles.logoWrapper,
           { opacity, transform: [{ scale }] },
         ]}>
-        <Image
-          source={{ uri: require('../assets/branding/BrandAssets').MoonBrandLightBase64 }}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <MoonLogo size={120} variant="light" style={styles.logo} />
+        <Text style={styles.appName}>Moonlight AI</Text>
+        <Text style={styles.developer}>Private AI for Android</Text>
+        <Text style={styles.status}>Preparing local AI...</Text>
       </Animated.View>
     </View>
   );
@@ -121,6 +121,27 @@ const styles = StyleSheet.create({
   logo: {
     width: 120,
     height: 120,
+    marginBottom: 16,
+  },
+  appName: {
+    color: '#F4F4F5',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  developer: {
+    color: '#9AA0A6',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 4,
+    marginBottom: 24,
+  },
+  status: {
+    color: '#6EA8FE',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
   },
 });
 

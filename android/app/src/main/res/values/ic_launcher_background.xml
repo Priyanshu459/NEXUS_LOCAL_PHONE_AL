@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Moonlight AI brand colors
-  ic_launcher_background: white — matches the canonical SVG white circle field
+  ic_launcher_background: dark adaptive-icon field behind the official white icon circle
   Source: C:\Dev\Website_for_Moon\moonlight-website\src\app\icon.svg (circle fill="#0F1014")
 -->
 <resources>

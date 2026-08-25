@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Dimensions, Easing, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AVAILABLE_MODELS } from '../constants/models';
 import { getSettings, saveSettings } from '../services/storage';
-import { checkModelExists, downloadModel, cancelDownload, deleteModel } from '../services/modelManager';
+import { checkModelExists, downloadModel, cancelDownload, deleteModel, getModelFilenameFromUrl } from '../services/modelManager';
 import { ContextualBottomAction } from '../components/ContextualBottomAction';
 import MoonLogo from '../components/MoonLogo';
-
-const { width: W } = Dimensions.get('window');
+import { CONTEXTUAL_ACTION_HEIGHT, DOCK_HEIGHT, DOCK_RESERVED_SPACE } from '../constants/layout';
 
 const C = {
   bg: '#131314',
@@ -32,7 +31,7 @@ const VertexModelCard = memo(({ model, isSelected, onPress, index }: any) => {
         Animated.timing(opacity, { toValue: 1, duration: 350, useNativeDriver: true }),
       ]),
     ]).start();
-  }, []);
+  }, [index, opacity, scale]);
 
   return (
     <Animated.View style={{ opacity, transform: [{ scale }], marginBottom: 14 }}>
@@ -148,11 +147,13 @@ export function ModelsScreen({ navigation }: any) {
   };
 
   const selectedModelInfo = AVAILABLE_MODELS.find(m => m.url === currentModelUrl);
+  const selectedModelName = selectedModelInfo?.name || getModelFilenameFromUrl(currentModelUrl);
+  const selectedModelSize = selectedModelInfo?.size || 'Custom GGUF';
 
   const getContextualState = () => {
     if (isDownloading) {
       return {
-        title: `Downloading ${selectedModelInfo?.name || 'Model'}`,
+        title: `Downloading ${selectedModelName}`,
         subtitle: `Please keep the app open`,
         progress: downloadProgress,
         primaryAction: { label: 'Cancel', onPress: handleCancelDownload, color: C.red }
@@ -161,16 +162,16 @@ export function ModelsScreen({ navigation }: any) {
     
     if (isInstalled && currentModelUrl === settings.modelUrl) {
       return {
-        title: `${selectedModelInfo?.name || 'Model'}`,
-        subtitle: 'Active model · Ready for chat',
+        title: selectedModelName,
+        subtitle: `${selectedModelSize} · Active model · Ready for chat`,
         primaryAction: { label: 'Delete', onPress: () => handleDelete(currentModelUrl), color: C.red }
       };
     }
 
     if (!isInstalled) {
       return {
-        title: `${selectedModelInfo?.name || 'Model'}`,
-        subtitle: `Size: ${selectedModelInfo?.size || 'Unknown'}`,
+        title: selectedModelName,
+        subtitle: `Size: ${selectedModelSize}`,
         primaryAction: { label: 'Download', onPress: () => handleDownload(currentModelUrl) }
       };
     }
@@ -188,17 +189,17 @@ export function ModelsScreen({ navigation }: any) {
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ color: C.textPrimary, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>Model Store</Text>
-              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0, 242, 254, 0.2)', borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.5)' }}>
-                <Text style={{ color: '#00F2FE', fontSize: 10, fontWeight: '800' }}>MOON CORE</Text>
+              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
+                <Text style={{ color: '#E2E8F0', fontSize: 10, fontWeight: '800' }}>ON-DEVICE</Text>
               </View>
             </View>
-            <Text style={{ color: C.textSecondary, fontSize: 13 }}>Moon Studio • On-Device Lunar Garden</Text>
+            <Text style={{ color: C.textSecondary, fontSize: 13 }}>Downloads require internet. Chat runs locally after setup.</Text>
           </View>
         </View>
       </View>
 
       <ScrollView 
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 120 }} 
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + DOCK_RESERVED_SPACE + CONTEXTUAL_ACTION_HEIGHT }}
         showsVerticalScrollIndicator={false}
       >
         {AVAILABLE_MODELS.map((model, idx) => (
@@ -226,7 +227,7 @@ export function ModelsScreen({ navigation }: any) {
           subtitle={contextState.subtitle}
           progress={contextState.progress}
           primaryAction={contextState.primaryAction}
-          bottomOffset={64} // Clear Moon Dock
+          bottomOffset={DOCK_HEIGHT + 18}
         />
       )}
     </View>

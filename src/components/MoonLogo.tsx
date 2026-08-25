@@ -1,8 +1,7 @@
 /**
  * MoonLogo — Reusable brand logo component
  *
- * Uses the official Moonlight AI brand icon (moonlight-icon.png for light bg,
- * moonlight-icon-light.png for dark bg).
+ * Uses the official Moonlight AI website icon.
  *
  * Usage:
  *   <MoonLogo size={40} />                    // on dark background (default)
@@ -11,29 +10,23 @@
 
 import React from 'react';
 import { Image, StyleSheet, View, ViewStyle } from 'react-native';
-import { MoonBrandLightBase64, MoonBrandDarkBase64 } from '../assets/branding/BrandAssets';
 
 interface MoonLogoProps {
   size?: number;
-  variant?: 'light' | 'dark';  // 'light' = white logo (for dark bg), 'dark' = black (for light bg)
+  variant?: 'light' | 'dark';
   style?: ViewStyle;
 }
 
 const MoonLogo: React.FC<MoonLogoProps> = ({
   size = 32,
-  variant = 'light',
+  variant: _variant = 'light',
   style,
 }) => {
-  const sourceUri =
-    variant === 'dark'
-      ? MoonBrandDarkBase64
-      : MoonBrandLightBase64;
-
   return (
-    <View style={[styles.container, { width: size, height: size }, style]}>
+    <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }, style]}>
       <Image
-        source={{ uri: sourceUri }}
-        style={{ width: size * 0.8, height: size * 0.8 }}
+        source={require('../assets/moon_icon.png')}
+        style={{ width: size, height: size }}
         resizeMode="contain"
         accessibilityLabel="Moonlight AI"
         accessibilityRole="image"
@@ -46,6 +39,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
 });
 

@@ -2,7 +2,9 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { StudioIcon, SparkleFourColorIcon, VaultIcon } from './GoogleIcons';
+import { StudioIcon, VaultIcon } from './GoogleIcons';
+import MoonLogo from './MoonLogo';
+import { DOCK_HEIGHT } from '../constants/layout';
 
 export function MoonDock({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
@@ -77,7 +79,7 @@ export function MoonDock({ state, descriptors, navigation }: BottomTabBarProps) 
             >
               <View style={styles.iconContainer}>
                 {route.name === 'Home' && <StudioIcon active={isFocused} />}
-                {route.name === 'Prompts' && <SparkleFourColorIcon size={22} />}
+                {route.name === 'Tools' && <MoonLogo size={22} variant="light" />}
                 {route.name === 'Models' && <VaultIcon active={isFocused} />}
               </View>
               <Text style={[styles.tabLabel, { color }]}>
@@ -106,7 +108,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 1,
     borderColor: 'rgba(99, 102, 241, 0.2)',
-    height: 64,
+    height: DOCK_HEIGHT,
     alignItems: 'center',
     paddingHorizontal: 4,
     overflow: 'hidden',

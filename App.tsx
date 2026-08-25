@@ -22,7 +22,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
-  Prompts: undefined;
+  Tools: undefined;
   Models: undefined;
 };
 
@@ -36,7 +36,7 @@ function MainTabs() {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="Home" component={WorkspaceScreen} />
-      <Tab.Screen name="Prompts" component={GalleryScreen} />
+      <Tab.Screen name="Tools" component={GalleryScreen} />
       <Tab.Screen name="Models" component={ModelsScreen} />
     </Tab.Navigator>
   );

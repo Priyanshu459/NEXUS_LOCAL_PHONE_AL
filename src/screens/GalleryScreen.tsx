@@ -4,9 +4,8 @@ import {
   Dimensions, Alert, Modal, TextInput, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
-import { GColor, GoogleAIEmblem, MenuIcon, GalleryCardIcon, SparklesIcon } from '../components/GoogleIcons';
+import { GColor, MoonlightAIEmblem, MenuIcon, GalleryCardIcon, SparklesIcon } from '../components/GoogleIcons';
+import { DOCK_RESERVED_SPACE } from '../constants/layout';
 
 
 
@@ -18,9 +17,9 @@ const MODULES = [
   { id: 'prompt_lab', type: 'prompt_lab', color: GColor.coral, status: 'Preview', title: 'Prompt Lab', desc: 'Try focused prompt templates.' },
   { id: 'settings', type: 'settings', color: GColor.blue, status: 'System', title: 'Settings', desc: 'Tune model and generation options.' },
   { id: 'audio_scribe', type: 'audio_scribe', color: GColor.green, status: 'Chat', title: 'Voice Input', desc: 'Speak into the chat composer.' },
-  { id: 'ask_image', type: 'ask_image', color: GColor.red, status: 'Soon', title: 'Images', desc: 'Vision model support is planned.' },
-  { id: 'agent_skills', type: 'agent_skills', color: GColor.yellow, status: 'Prompt', title: 'Agent Skills', desc: 'Use structured system prompts.' },
-  { id: 'notifications', type: 'notifications', color: GColor.red, status: 'Soon', title: 'Notifications', desc: 'Scheduled assistant updates.' },
+  { id: 'ask_image', type: 'ask_image', color: GColor.red, status: 'Roadmap', title: 'Images', desc: 'Vision support is planned.' },
+  { id: 'prompt_templates', type: 'agent_skills', color: GColor.yellow, status: 'Prompt', title: 'Prompt Templates', desc: 'Draft structured prompts before sending them to chat.' },
+  { id: 'notifications', type: 'notifications', color: GColor.red, status: 'Roadmap', title: 'Notifications', desc: 'Scheduled assistant updates are planned.' },
 ];
 
 export function GalleryScreen({ navigation }: any) {
@@ -42,8 +41,8 @@ export function GalleryScreen({ navigation }: any) {
       setShowPromptLab(true);
     } else if (id === 'audio_scribe') {
       Alert.alert("Voice Input", "Switch to Moonlight Chat and tap the microphone icon to use the device speech recognizer.");
-    } else if (id === 'agent_skills') {
-      Alert.alert("Agent Skills", "Agent Skills enable local LLMs to reason over structured tasks and system rules. Manage system prompts in Settings.");
+    } else if (id === 'prompt_templates') {
+      Alert.alert("Prompt Templates", "Moonlight AI can draft structured prompts here. Autonomous agents and local plugins are roadmap features.");
     } else if (id === 'ask_image') {
       Alert.alert("Images", "Vision model support is coming soon. Current GGUF text models cannot inspect images directly.");
     } else if (id === 'tiny_garden') {
@@ -51,7 +50,7 @@ export function GalleryScreen({ navigation }: any) {
     } else if (id === 'mobile_actions') {
       Alert.alert("Mobile Actions", "On-device mobile automation benchmark. Designed for secure, zero-latency local execution.");
     } else if (id === 'notifications') {
-      Alert.alert("Notifications", "No scheduled AI notifications pending. Background inference engine is idle.");
+      Alert.alert("Notifications", "Scheduled assistant updates and background workflows are roadmap features.");
     }
   };
 
@@ -74,7 +73,7 @@ export function GalleryScreen({ navigation }: any) {
             <MenuIcon />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <GoogleAIEmblem size={24} />
+            <MoonlightAIEmblem size={28} />
             <Text style={S.appBarTitle}>Tools</Text>
           </View>
         </View>
@@ -82,7 +81,7 @@ export function GalleryScreen({ navigation }: any) {
 
       <ScrollView
         style={S.scroll}
-        contentContainerStyle={[S.content, { paddingBottom: Math.max(insets.bottom, 20) + 100 }]}
+        contentContainerStyle={[S.content, { paddingBottom: insets.bottom + DOCK_RESERVED_SPACE }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={S.intro}>
@@ -94,7 +93,7 @@ export function GalleryScreen({ navigation }: any) {
             <TouchableOpacity key={module.id} style={S.card} onPress={() => handleCardPress(module.id)} activeOpacity={0.82}>
               <View style={S.cardHeader}>
                 <GalleryCardIcon type={module.type} color={module.color} size={38} />
-                <View style={S.statusPill}>
+                <View style={[S.statusPill, module.status === 'Roadmap' && S.roadmapPill]}>
                   <Text style={S.cardSub}>{module.status}</Text>
                 </View>
               </View>
@@ -156,7 +155,7 @@ const S = StyleSheet.create({
     backgroundColor: GColor.bg,
   },
   appBar: {
-    height: 58,
+    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -175,7 +174,7 @@ const S = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: GColor.surface,
+    backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: GColor.border,
   },
@@ -220,7 +219,7 @@ const S = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: GColor.border,
-    minHeight: 148,
+    minHeight: 150,
     justifyContent: 'flex-start',
   },
   cardHeader: {
@@ -238,10 +237,13 @@ const S = StyleSheet.create({
     paddingVertical: 3,
   },
   cardSub: {
-    color: GColor.textMuted,
+    color: '#B5BAC4',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0,
+  },
+  roadmapPill: {
+    opacity: 0.72,
   },
   cardTitle: {
     color: GColor.textPrimary,

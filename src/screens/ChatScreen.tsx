@@ -12,7 +12,7 @@ import { checkModelExists, downloadModel, getModelPath, deleteModel, cancelDownl
 import { initLlama, LlamaContext } from 'llama.rn';
 import { NativeModules, PermissionsAndroid } from 'react-native';
 import { getMemoryContextString, addMemory, parseMemoryActions } from '../services/MemoryManager';
-import { GoogleAIEmblem, ArrowLeftIcon, SendArrowIcon, AttachmentIcon, CopyIcon } from '../components/GoogleIcons';
+import { MoonlightAIEmblem, ArrowLeftIcon, SendArrowIcon, AttachmentIcon, CopyIcon } from '../components/GoogleIcons';
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 type Message = { id: string; role: 'user' | 'assistant' | 'system'; content: string };
 
@@ -73,7 +73,7 @@ const MenuIcon = () => (
   </View>
 );
 
-// ── Moon Studio Official Logo Mark ─────────────────────────────────────────
+// ── Moonlight AI Official Logo Mark ────────────────────────────────────────
 function LogoMark({ size = 36 }: { size?: number }) {
   const pulse = useRef(new Animated.Value(1)).current;
   const glow = useRef(new Animated.Value(0.4)).current;
@@ -96,9 +96,9 @@ function LogoMark({ size = 36 }: { size?: number }) {
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View style={{
-        position: 'absolute', width: size * 1.5, height: size * 1.5,
-        borderRadius: size * 0.75, backgroundColor: 'rgba(0, 242, 254, 0.18)',
+        <Animated.View style={{
+          position: 'absolute', width: size * 1.25, height: size * 1.25,
+          borderRadius: size * 0.625, backgroundColor: 'rgba(0, 242, 254, 0.10)',
         opacity: glow, transform: [{ scale: pulse }],
       }} />
       <Animated.View style={{
@@ -116,7 +116,7 @@ function LogoMark({ size = 36 }: { size?: number }) {
   );
 }
 
-// ── Moon Studio Avatar ────────────────────────────────────────────────────
+// ── Moonlight AI Avatar ───────────────────────────────────────────────────
 function AIAvatar({ size = 28, isGenerating = false }: { size?: number, isGenerating?: boolean }) {
   const spin = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(1)).current;
@@ -145,24 +145,24 @@ function AIAvatar({ size = 28, isGenerating = false }: { size?: number, isGenera
 
   return (
     <View style={{
-      width: size, height: size, borderRadius: size * 0.35,
-      backgroundColor: '#1E1F22', borderWidth: 1, borderColor: isGenerating ? '#00F2FE' : 'rgba(255,255,255,0.1)',
+      width: size, height: size, borderRadius: size / 2,
+      backgroundColor: 'transparent', borderWidth: 1, borderColor: isGenerating ? '#00F2FE' : 'rgba(255,255,255,0.12)',
       alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-      shadowColor: isGenerating ? '#00F2FE' : 'transparent', shadowOpacity: 0.6, shadowRadius: 6, elevation: 4
+      shadowColor: isGenerating ? '#00F2FE' : 'transparent', shadowOpacity: 0.2, shadowRadius: 4, elevation: isGenerating ? 3 : 0
     }}>
       {isGenerating && (
         <Animated.View style={{
           position: 'absolute', width: size + 6, height: size + 6,
-          borderRadius: (size + 6) * 0.35, borderWidth: 1.5, borderColor: '#7F00FF',
+          borderRadius: (size + 6) / 2, borderWidth: 1.5, borderColor: '#7F00FF',
           borderStyle: 'dashed', transform: [{ rotate: spinInterpolate }, { scale: pulse }]
         }} />
       )}
-      <GoogleAIEmblem size={size * 0.82} />
+      <MoonlightAIEmblem size={size * 0.82} />
     </View>
   );
 }
 
-// ── Typing indicator (Moon Studio Lunar Engine) ────────────────────────────
+// ── Typing indicator ──────────────────────────────────────────────────────
 function TypingIndicator() {
   const anims = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
   const colors = ['#00F2FE', '#7F00FF', '#FF007F', '#3B82F6'];
@@ -184,7 +184,7 @@ function TypingIndicator() {
     <View style={S.msgRow}>
       <AIAvatar isGenerating={true} />
       <View style={[S.typingBubble, { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: '#1E1F22', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.25)' }]}>
-        <Text style={{ color: '#9AA0A6', fontSize: 12, fontWeight: '600', marginRight: 4 }}>Moon Studio Thinking...</Text>
+        <Text style={{ color: '#9AA0A6', fontSize: 12, fontWeight: '600', marginRight: 4 }}>Moonlight AI Thinking...</Text>
         {anims.map((a, i) => (
           <Animated.View key={i} style={{
             width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors[i],
@@ -230,7 +230,7 @@ const MessageBubble = memo(({ item, isGenerating }: { item: Message, isGeneratin
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: C.surfaceHighlight, borderRadius: 12 }}
                   onPress={() => {
                     NativeModules.DeviceControl?.copyToClipboard?.(item.content);
-                    Alert.alert('Moon Studio', 'Response copied to clipboard.');
+                    Alert.alert('Moonlight AI', 'Response copied to clipboard.');
                   }}
                   activeOpacity={0.7}
                 >
@@ -249,95 +249,95 @@ const MessageBubble = memo(({ item, isGenerating }: { item: Message, isGeneratin
 });
 
 
-// ── AVAILABLE TOP MODELS (Google Vertex Model Garden) ─────────────────────
+// ── Compatible GGUF models ────────────────────────────────────────────────
 const AVAILABLE_MODELS = [
   {
     id: "llama32-1b",
     name: "Llama 3.2 1B",
-    desc: "Extremely fast, very capable. Perfect for older devices and rapid on-device prototyping.",
+    desc: "Compact GGUF model for quick on-device chat on a wide range of Android devices.",
     url: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
     color: '#4285F4',
     size: "1.3 GB",
     provider: "Meta AI",
-    badge: "⚡ Ultralight",
-    tags: ["45+ TPS", "4-bit Quant", "Low RAM"]
+    badge: "Lightweight",
+    tags: ["GGUF", "4-bit quant", "Lower RAM"]
   },
   {
     id: "qwen25-15b",
     name: "Qwen 2.5 1.5B",
-    desc: "Unbeatable reasoning and math accuracy for its compact size. Lightning fast response time.",
+    desc: "Small instruction model with a practical balance of reasoning quality and phone-friendly size.",
     url: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
     color: '#A142F4',
     size: "1.1 GB",
     provider: "Alibaba",
-    badge: "🧠 Top Reasoning",
-    tags: ["50+ TPS", "Math & Logic", "Q4_K_M"]
+    badge: "Compact",
+    tags: ["GGUF", "Reasoning", "Q4_K_M"]
   },
   {
     id: "llama32-3b",
     name: "Llama 3.2 3B",
-    desc: "The sweet spot of general intelligence and generation speed for daily conversational tasks.",
+    desc: "General-purpose local chat model for newer devices with enough free storage and memory.",
     url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
     color: '#1A73E8',
     size: "2.1 GB",
     provider: "Meta AI",
-    badge: "🌟 Recommended",
-    tags: ["32 TPS", "High Accuracy", "3B Params"]
+    badge: "Recommended",
+    tags: ["GGUF", "General chat", "3B params"]
   },
   {
     id: "deepseek-15b",
     name: "DeepSeek R1 1.5B",
-    desc: "Distilled reasoning architecture. Formulates internal thought chains before answering.",
+    desc: "Reasoning-focused distilled model. Output style and speed depend on device and prompt.",
     url: "https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
     color: '#FBBC04',
     size: "1.1 GB",
     provider: "DeepSeek",
-    badge: "🔬 Deep Thought",
-    tags: ["CoT Reasoning", "Distilled", "1.5B"]
+    badge: "Reasoning",
+    tags: ["GGUF", "Distilled", "1.5B"]
   },
   {
     id: "gemma2-2b",
     name: "Gemma 2 2B",
-    desc: "Lightweight but punchy neural architecture designed for on-device semantic understanding.",
+    desc: "Lightweight instruction model for local text chat and summarization-style prompts.",
     url: "https://huggingface.co/bartowski/gemma-2-2b-it-GGUF/resolve/main/gemma-2-2b-it-Q4_K_M.gguf",
     color: '#00F2FE',
     size: "1.6 GB",
-    provider: "Neural Arch",
-    badge: "✦ Quantum Core",
-    tags: ["Official Arch", "38 TPS", "2B Params"]
+    provider: "Google",
+    badge: "Small",
+    tags: ["GGUF", "Instruction tuned", "2B params"]
   },
   {
     id: "phi3-mini",
     name: "Phi-3 Mini 3.8B",
-    desc: "Microsoft's small model that hits way above its weight class with rich contextual memory.",
+    desc: "Microsoft small language model for local instruction following on capable devices.",
     url: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
     color: '#00A4EF',
     size: "2.4 GB",
     provider: "Microsoft",
-    badge: "💼 Enterprise",
-    tags: ["4K Context", "Dense", "Q4 Quant"]
+    badge: "Capable",
+    tags: ["GGUF", "4K context", "Q4 quant"]
   },
   {
     id: "mistral-7b",
     name: "Mistral 7B (v0.3)",
-    desc: "Professional flagship 7B model. Requires 8GB+ RAM to run smoothly without paging.",
+    desc: "Larger local chat model for high-memory devices. Expect slower setup and generation.",
     url: "https://huggingface.co/MaziyarPanahi/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3.Q4_K_M.gguf",
     color: '#EA4335',
     size: "4.4 GB",
     provider: "Mistral AI",
-    badge: "🔥 Flagship 7B",
-    tags: ["High Capacity", "v0.3 Instruct", "8GB RAM"]
+    badge: "Large",
+    tags: ["GGUF", "v0.3 instruct", "8GB+ RAM"]
   },
 ];
 
-// ── Splash Screen (Futuristic Boot Animation) ──────────────────────────────
+// ── Splash Screen ─────────────────────────────────────────────────────────
 function SplashScreen() {
   const pulse = useRef(new Animated.Value(0.85)).current;
   const rotate1 = useRef(new Animated.Value(0)).current;
   const rotate2 = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
-  const [statusText, setStatusText] = useState('INITIALIZING NEURAL CORE');
+  const [statusText, setStatusText] = useState('STARTING MOONLIGHT AI');
 
   useEffect(() => {
     Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }).start();
@@ -357,8 +357,8 @@ function SplashScreen() {
       Animated.timing(rotate2, { toValue: 1, duration: 11000, easing: Easing.linear, useNativeDriver: true })
     ).start();
 
-    const t1 = setTimeout(() => setStatusText('CALIBRATING LOCAL WEIGHTS'), 900);
-    const t2 = setTimeout(() => setStatusText('MOON STUDIO CORE ONLINE'), 1800);
+    const t1 = setTimeout(() => setStatusText('CHECKING LOCAL RUNTIME'), 900);
+    const t2 = setTimeout(() => setStatusText('ON-DEVICE RUNTIME READY'), 1800);
 
     return () => {
       clearTimeout(t1);
@@ -419,12 +419,12 @@ function SplashScreen() {
           letterSpacing: 6, marginTop: 36, textTransform: 'uppercase',
           textAlign: 'center', textShadowColor: 'rgba(99, 102, 241, 0.6)',
           textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 16
-        }}>MOON STUDIO</Text>
+        }}>MOONLIGHT AI</Text>
 
         <Text style={{
           color: 'rgba(148, 163, 184, 0.8)', fontSize: 12, fontWeight: '600',
           letterSpacing: 4, marginTop: 6, textTransform: 'uppercase'
-        }}>ON-DEVICE LUNAR NEURAL LAB</Text>
+        }}>PRIVATE AI FOR ANDROID</Text>
 
         {/* Status indicator pill */}
         <View style={{
@@ -576,10 +576,10 @@ function SetupScreen({ currentModelUrl, isDownloading, downloadProgress, onDownl
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Text style={{ color: C.textPrimary, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>Model Store</Text>
               <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(0, 242, 254, 0.2)', borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.5)' }}>
-                <Text style={{ color: '#00F2FE', fontSize: 10, fontWeight: '800' }}>MOON CORE</Text>
+                <Text style={{ color: '#00F2FE', fontSize: 10, fontWeight: '800' }}>ON-DEVICE</Text>
               </View>
             </View>
-            <Text style={{ color: C.textSecondary, fontSize: 13 }}>Moon Studio • On-Device Lunar Garden</Text>
+            <Text style={{ color: C.textSecondary, fontSize: 13 }}>Downloads require internet. Chat runs locally after setup.</Text>
           </View>
         </View>
       </View>
@@ -659,7 +659,7 @@ const ChatInputBar = memo(({
         </TouchableOpacity>
         <TextInput
           style={S.input}
-          placeholder={attachedFile ? "Ask about attached document..." : "Message Moon Studio..."}
+          placeholder={attachedFile ? "Ask about attached document..." : "Message Moonlight AI..."}
           placeholderTextColor={C.textMuted}
           value={localText}
           onChangeText={setLocalText}
@@ -976,10 +976,10 @@ export function ChatScreen({ navigation, route }: Props) {
             <ArrowLeftIcon />
           </TouchableOpacity>
           <TouchableOpacity style={S.headerBrand} onPress={() => setShowModelModal(true)} activeOpacity={0.7}>
-            <GoogleAIEmblem size={24} />
+            <MoonlightAIEmblem size={24} />
             <View style={{ gap: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={S.headerBrandName}>Moon Studio Chat</Text>
+                <Text style={S.headerBrandName}>Moonlight AI Chat</Text>
                 <View style={{ width: 0, height: 0, borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.textSecondary, marginTop: 2 }} />
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -1022,7 +1022,7 @@ export function ChatScreen({ navigation, route }: Props) {
             <View style={S.emptyState}>
               <LogoMark size={48} />
               <Text style={S.emptyTitle}>Good to see you.</Text>
-              <Text style={S.emptyBody}>Ask me anything. I run entirely on your device — no cloud, no tracking.</Text>
+              <Text style={S.emptyBody}>Ask me anything. After a model is installed, prompts and responses are processed on your device.</Text>
               <View style={S.suggestionsWrap}>
                 {['Explain quantum computing simply', 'Write a haiku about code', 'What is the Fermi paradox?'].map(s => (
                   <TouchableOpacity key={s} style={S.suggestionChip} onPress={() => setInputText(s)} activeOpacity={0.7}>
@@ -1045,7 +1045,7 @@ export function ChatScreen({ navigation, route }: Props) {
               '✨ Summarize document',
               '💡 Brainstorm architecture',
               '📝 Refactor code',
-              '🌍 Translate audio',
+              '🌍 Translate pasted text',
               '🔍 Debug JSDoc',
             ].map(chip => (
               <TouchableOpacity
