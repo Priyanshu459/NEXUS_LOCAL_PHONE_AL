@@ -234,7 +234,7 @@ const MessageBubble = memo(({ item, isGenerating }: { item: Message, isGeneratin
                   }}
                   activeOpacity={0.7}
                 >
-                  <CopyIcon color={C.textSecondary} size={14} />
+                  <CopyIcon color={C.textSecondary}  />
                   <Text style={{ fontSize: 11, color: C.textSecondary, fontWeight: '600' }}>Copy</Text>
                 </TouchableOpacity>
               </View>
@@ -648,14 +648,14 @@ const ChatInputBar = memo(({
   };
 
   return (
-    <View style={[S.inputBar, { paddingBottom: insetsBottom + 10 }]}>
+    <View style={[S.inputBar, { marginBottom: insetsBottom + 12 }]}>
       <View style={S.inputWrap}>
         <TouchableOpacity
           onPress={onPickFile}
           style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
           activeOpacity={0.7}
         >
-          <AttachmentIcon color={C.textSecondary} size={20} />
+          <AttachmentIcon color={C.textSecondary} />
         </TouchableOpacity>
         <TextInput
           style={S.input}
@@ -1075,7 +1075,7 @@ export function ChatScreen({ navigation, route }: Props) {
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
           }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-              <AttachmentIcon color={C.blue} size={18} />
+              <AttachmentIcon color={C.blue} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: C.textPrimary }} numberOfLines={1}>{attachedFile.name}</Text>
                 <Text style={{ fontSize: 11, color: C.blue }}>Attached Document • {attachedFile.size}</Text>
@@ -1168,7 +1168,7 @@ const S = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  chatContent: { padding: 16, paddingBottom: 8 },
+  chatContent: { padding: 16, paddingBottom: 40 },
   msgRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 8 },
 
   userRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingLeft: 48 },
@@ -1207,15 +1207,17 @@ const S = StyleSheet.create({
 
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-    paddingHorizontal: 12, paddingTop: 10,
-    borderTopWidth: 1, borderTopColor: C.border,
-    backgroundColor: C.bg,
+    marginHorizontal: 16,
+    padding: 10,
+    backgroundColor: '#1E2024',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.3)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 16, elevation: 10,
   },
   inputWrap: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: C.surface, borderRadius: 20,
-    borderWidth: 1, borderColor: C.border,
-    paddingLeft: 15, paddingRight: 4,
+    paddingLeft: 4, paddingRight: 4,
     minHeight: 46,
   },
   input: { flex: 1, color: C.textPrimary, fontSize: 15, maxHeight: 130, paddingVertical: 4 },

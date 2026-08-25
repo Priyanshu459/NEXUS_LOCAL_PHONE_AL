@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Moonlight AI — splash screen background color
+  Matches the app's dark surface color (#0F1014) from GColor.bg in GoogleIcons.tsx
+-->
+<resources>
+    <color name="splash_background">#0F1014</color>
+</resources>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  Animated, Easing, Alert,
+  Animated, Easing, Alert, Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,21 +11,21 @@ import { getSettings, saveSettings, AppSettings, defaultSettings } from '../serv
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
 const C = {
-  bg: '#131314',
-  surface: '#1E1F22',
-  surfaceHigh: '#282A2F',
-  border: 'rgba(255, 255, 255, 0.08)',
-  borderHigh: 'rgba(255, 255, 255, 0.15)',
-  accent: '#4285F4',
-  accentDim: '#1A3B6E',
-  textPrimary: '#F2F2F2',
-  textSecondary: '#9AA0A6',
-  textMuted: '#5F6368',
-  green: '#34A853',
-  red: '#EA4335',
-  purple: '#A142F4',
-  indigo: '#4285F4',
-  pink: '#FF6D01',
+  bg: '#0F1014',
+  surface: '#191A20',
+  surfaceHigh: '#24262F',
+  border: 'rgba(255, 255, 255, 0.10)',
+  borderHigh: 'rgba(255, 255, 255, 0.18)',
+  accent: '#6EA8FE',
+  accentDim: '#1B355C',
+  textPrimary: '#F4F4F5',
+  textSecondary: '#B5BAC4',
+  textMuted: '#777D89',
+  green: '#24D3B5',
+  red: '#FF5A7A',
+  purple: '#B08CFF',
+  indigo: '#6EA8FE',
+  pink: '#FF8A5B',
 };
 
 // Back Icon
@@ -182,7 +182,7 @@ export function SettingsScreen({ navigation }: Props) {
           </View>
           <View style={styles.hintRow}>
             <View style={styles.hintDotWrap} />
-            <Text style={styles.hintText}>Use quantized .gguf models. Re-download required when changed.</Text>
+          <Text style={styles.hintText}>Use a direct quantized .gguf URL. Changing it requires a new download.</Text>
           </View>
         </View>
 
@@ -224,6 +224,26 @@ export function SettingsScreen({ navigation }: Props) {
           />
         </View>
 
+        <SectionLabel label="Memory And Privacy" />
+        <View style={styles.card}>
+          <View style={styles.toggleRow}>
+            <View style={{ flex: 1, gap: 3 }}>
+              <Text style={styles.paramLabel}>Memory</Text>
+              <Text style={styles.paramDesc}>Allow the assistant to reuse facts it explicitly saves from chat.</Text>
+            </View>
+            <Switch
+              value={settings.memoryEnabled}
+              onValueChange={v => update('memoryEnabled', v)}
+              trackColor={{ false: C.surfaceHigh, true: C.accentDim }}
+              thumbColor={settings.memoryEnabled ? C.accent : C.textSecondary}
+            />
+          </View>
+          <View style={styles.paramDivider} />
+          <Text style={styles.privacyText}>
+            Chats, settings, downloaded models, and saved memories are stored on this device. Local model inference runs on device after a model is downloaded. Voice input uses the operating system speech recognizer, which may use network services depending on device settings. File attachments read selected text into the current chat only.
+          </Text>
+        </View>
+
         {/* ── About ───────────────────────────────── */}
         <View style={styles.about}>
           <View style={styles.aboutLogo}>
@@ -233,8 +253,8 @@ export function SettingsScreen({ navigation }: Props) {
               <View style={{ position: 'absolute', left: 2, top: 0, width: 11, height: 2, backgroundColor: C.accent, borderRadius: 1, transform: [{ rotate: '36deg' }, { translateY: 1 }] }} />
             </View>
           </View>
-          <Text style={styles.aboutName}>Moon Studio</Text>
-          <Text style={styles.aboutSub}>Private AI · On-device · llama.cpp</Text>
+          <Text style={styles.aboutName}>Moonlight AI</Text>
+          <Text style={styles.aboutSub}>Local model runtime · llama.cpp</Text>
         </View>
       </Animated.ScrollView>
     </View>
@@ -249,13 +269,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14, gap: 12,
   },
   backBtn: {
-    width: 34, height: 34, borderRadius: 9,
+    width: 36, height: 36, borderRadius: 12,
     backgroundColor: C.surface, borderWidth: 1, borderColor: C.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: C.textPrimary, letterSpacing: -0.3 },
+  headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: C.textPrimary, letterSpacing: 0 },
   resetBtn: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
     borderWidth: 1, borderColor: '#3B1010', backgroundColor: '#160808',
   },
   resetBtnText: { color: C.red, fontSize: 12, fontWeight: '600' },
@@ -264,18 +284,18 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 16, paddingTop: 8, gap: 6 },
 
   sectionLabel: {
-    fontSize: 11, fontWeight: '700', color: C.textMuted,
-    letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6, marginTop: 14, marginLeft: 2,
+    fontSize: 12, fontWeight: '800', color: C.textSecondary,
+    letterSpacing: 0, marginBottom: 6, marginTop: 14, marginLeft: 2,
   },
 
   card: {
-    backgroundColor: C.surface, borderRadius: 16,
+    backgroundColor: C.surface, borderRadius: 14,
     padding: 16, borderWidth: 1, borderColor: C.border, gap: 10,
   },
   cardFieldLabel: { fontSize: 12, color: C.textMuted, fontWeight: '600', letterSpacing: 0.3 },
 
   urlField: {
-    backgroundColor: C.bg, borderRadius: 10,
+    backgroundColor: C.bg, borderRadius: 12,
     borderWidth: 1, borderColor: C.border,
     paddingHorizontal: 12, paddingVertical: 2,
   },
@@ -288,7 +308,7 @@ const styles = StyleSheet.create({
   hintText: { color: C.textMuted, fontSize: 12, flex: 1, lineHeight: 18 },
 
   promptField: {
-    backgroundColor: C.bg, borderRadius: 10,
+    backgroundColor: C.bg, borderRadius: 12,
     borderWidth: 1, borderColor: C.border,
     paddingHorizontal: 12, paddingVertical: 10,
     color: C.textPrimary, fontSize: 14, lineHeight: 22, minHeight: 100,
@@ -305,6 +325,12 @@ const styles = StyleSheet.create({
   },
   valueNum: { fontSize: 13, fontWeight: '700' },
   paramDivider: { height: 1, backgroundColor: C.border },
+  toggleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 14,
+  },
+  privacyText: {
+    color: C.textSecondary, fontSize: 12, lineHeight: 18,
+  },
 
   about: {
     alignItems: 'center', gap: 5, paddingVertical: 20, marginTop: 16,

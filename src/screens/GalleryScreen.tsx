@@ -8,12 +8,22 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { GColor, GoogleAIEmblem, MenuIcon, GalleryCardIcon, SparklesIcon } from '../components/GoogleIcons';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Gallery'>;
+
 
 const { width: W } = Dimensions.get('window');
 const CARD_WIDTH = (W - 48) / 2;
+const MODULES = [
+  { id: 'ai_chat', type: 'ai_chat', color: GColor.blue, status: 'Ready', title: 'Chat', desc: 'Talk with the selected local model.' },
+  { id: 'models', type: 'models', color: GColor.green, status: 'Ready', title: 'Models', desc: 'Choose and download GGUF models.' },
+  { id: 'prompt_lab', type: 'prompt_lab', color: GColor.coral, status: 'Preview', title: 'Prompt Lab', desc: 'Try focused prompt templates.' },
+  { id: 'settings', type: 'settings', color: GColor.blue, status: 'System', title: 'Settings', desc: 'Tune model and generation options.' },
+  { id: 'audio_scribe', type: 'audio_scribe', color: GColor.green, status: 'Chat', title: 'Voice Input', desc: 'Speak into the chat composer.' },
+  { id: 'ask_image', type: 'ask_image', color: GColor.red, status: 'Soon', title: 'Images', desc: 'Vision model support is planned.' },
+  { id: 'agent_skills', type: 'agent_skills', color: GColor.yellow, status: 'Prompt', title: 'Agent Skills', desc: 'Use structured system prompts.' },
+  { id: 'notifications', type: 'notifications', color: GColor.red, status: 'Soon', title: 'Notifications', desc: 'Scheduled assistant updates.' },
+];
 
-export function GalleryScreen({ navigation }: Props) {
+export function GalleryScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [showPromptLab, setShowPromptLab] = useState(false);
   const [promptLabInput, setPromptLabInput] = useState('Summarize the theory of relativity in 2 bullet points.');
@@ -31,11 +41,11 @@ export function GalleryScreen({ navigation }: Props) {
     } else if (id === 'prompt_lab') {
       setShowPromptLab(true);
     } else if (id === 'audio_scribe') {
-      Alert.alert("Audio Scribe", "Transcribe and summarize audio locally. Switch to Moon Studio Chat and tap the microphone icon to begin real-time speech recognition.");
+      Alert.alert("Voice Input", "Switch to Moonlight Chat and tap the microphone icon to use the device speech recognizer.");
     } else if (id === 'agent_skills') {
       Alert.alert("Agent Skills", "Agent Skills enable local LLMs to reason over structured tasks and system rules. Manage system prompts in Settings.");
     } else if (id === 'ask_image') {
-      Alert.alert("Ask Image", "Multimodal vision model support (4 Models available in Neural Studio). Connect compatible vision GGUF weights in Settings.");
+      Alert.alert("Images", "Vision model support is coming soon. Current GGUF text models cannot inspect images directly.");
     } else if (id === 'tiny_garden') {
       Alert.alert("Tiny Garden", "Welcome to Tiny Garden! An experimental interactive benchmark demonstrating natural language state management on-device.");
     } else if (id === 'mobile_actions') {
@@ -57,124 +67,41 @@ export function GalleryScreen({ navigation }: Props) {
 
   return (
     <View style={[S.screen, { paddingTop: insets.top }]}>
-      {/* Top App Bar matching Moon Studio Gallery */}
+      {/* Top App Bar */}
       <View style={S.appBar}>
         <View style={S.appBarLeft}>
-          <TouchableOpacity style={S.iconBtn} onPress={() => Alert.alert("Moon Studio", "Local LLM Runtime v0.86\nPowered by Moon NDK & Llama.rn")} activeOpacity={0.7}>
+          <TouchableOpacity style={S.iconBtn} onPress={() => Alert.alert("Moonlight AI", "Local model runtime powered by llama.rn.")} activeOpacity={0.7}>
             <MenuIcon />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <GoogleAIEmblem size={24} />
-            <Text style={S.appBarTitle}>Moon Studio Gallery</Text>
+            <Text style={S.appBarTitle}>Tools</Text>
           </View>
         </View>
       </View>
 
       <ScrollView
         style={S.scroll}
-        contentContainerStyle={[S.content, { paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[S.content, { paddingBottom: Math.max(insets.bottom, 20) + 100 }]}
         showsVerticalScrollIndicator={false}
       >
+        <View style={S.intro}>
+          <Text style={S.introTitle}>Choose a workspace</Text>
+          <Text style={S.introBody}>Open chat, manage models, or start from a focused task.</Text>
+        </View>
         <View style={S.grid}>
-          {/* Ask Image */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('ask_image')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="ask_image" color={GColor.red} />
-            </View>
-            <Text style={S.cardSub}>4 Models</Text>
-            <Text style={S.cardTitle}>Ask Image</Text>
-            <Text style={S.cardDesc}>Ask questions about images</Text>
-          </TouchableOpacity>
-
-          {/* Audio Scribe */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('audio_scribe')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="audio_scribe" color={GColor.green} />
-            </View>
-            <Text style={S.cardSub}>4 Models</Text>
-            <Text style={S.cardTitle}>Audio Scribe</Text>
-            <Text style={S.cardDesc}>Transcribe and translate audio</Text>
-          </TouchableOpacity>
-
-          {/* AI Chat */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('ai_chat')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="ai_chat" color={GColor.blue} />
-            </View>
-            <Text style={S.cardSub}>7 Models</Text>
-            <Text style={S.cardTitle}>Moon Studio Chat</Text>
-            <Text style={S.cardDesc}>Chat with an on-device LLM</Text>
-          </TouchableOpacity>
-
-          {/* Agent Skills */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('agent_skills')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="agent_skills" color={GColor.yellow} />
-            </View>
-            <Text style={S.cardSub}>2 Models</Text>
-            <Text style={S.cardTitle}>Agent Skills</Text>
-            <Text style={S.cardDesc}>Complete agentic tasks with chat</Text>
-          </TouchableOpacity>
-
-          {/* Prompt Lab */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('prompt_lab')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="prompt_lab" color={GColor.red} />
-            </View>
-            <Text style={S.cardSub}>7 Models</Text>
-            <Text style={S.cardTitle}>Prompt Lab</Text>
-            <Text style={S.cardDesc}>Single turn use cases</Text>
-          </TouchableOpacity>
-
-          {/* Tiny Garden */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('tiny_garden')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="tiny_garden" color={GColor.green} />
-            </View>
-            <Text style={S.cardSub}>1 Model</Text>
-            <Text style={S.cardTitle}>Tiny Garden</Text>
-            <Text style={S.cardDesc}>Use natural language to plant</Text>
-          </TouchableOpacity>
-
-          {/* Mobile Actions */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('mobile_actions')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="mobile_actions" color={GColor.blue} />
-            </View>
-            <Text style={S.cardSub}>1 Model</Text>
-            <Text style={S.cardTitle}>Mobile Actions</Text>
-            <Text style={S.cardDesc}>Automate device workflows</Text>
-          </TouchableOpacity>
-
-          {/* Settings */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('settings')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="settings" color={GColor.blue} />
-            </View>
-            <Text style={S.cardSub}>System</Text>
-            <Text style={S.cardTitle}>Settings</Text>
-            <Text style={S.cardDesc}>Manage application settings</Text>
-          </TouchableOpacity>
-
-          {/* Models */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('models')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="models" color={GColor.green} />
-            </View>
-            <Text style={S.cardSub}>Storage & GGUF</Text>
-            <Text style={S.cardTitle}>Models</Text>
-            <Text style={S.cardDesc}>Browse, try, and benchmark models</Text>
-          </TouchableOpacity>
-
-          {/* Notifications */}
-          <TouchableOpacity style={S.card} onPress={() => handleCardPress('notifications')} activeOpacity={0.8}>
-            <View style={S.cardHeader}>
-              <GalleryCardIcon type="notifications" color={GColor.red} />
-            </View>
-            <Text style={S.cardSub}>Alerts</Text>
-            <Text style={S.cardTitle}>Notifications</Text>
-            <Text style={S.cardDesc}>View scheduled notifications</Text>
-          </TouchableOpacity>
+          {MODULES.map(module => (
+            <TouchableOpacity key={module.id} style={S.card} onPress={() => handleCardPress(module.id)} activeOpacity={0.82}>
+              <View style={S.cardHeader}>
+                <GalleryCardIcon type={module.type} color={module.color} size={38} />
+                <View style={S.statusPill}>
+                  <Text style={S.cardSub}>{module.status}</Text>
+                </View>
+              </View>
+              <Text style={S.cardTitle}>{module.title}</Text>
+              <Text style={S.cardDesc}>{module.desc}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </ScrollView>
 
@@ -192,7 +119,7 @@ export function GalleryScreen({ navigation }: Props) {
               </TouchableOpacity>
             </View>
 
-            <Text style={S.modalDesc}>Test single-turn prompts against the local neural engine with zero overhead.</Text>
+            <Text style={S.modalDesc}>Draft a prompt, then move it into chat when you are ready to run it against your selected model.</Text>
 
             <View style={S.inputBoxWrap}>
               <TextInput
@@ -207,12 +134,12 @@ export function GalleryScreen({ navigation }: Props) {
 
             <TouchableOpacity style={S.runBtn} onPress={runPromptLab} disabled={isSimulating} activeOpacity={0.8}>
               <SparklesIcon size={18} />
-              <Text style={S.runBtnText}>{isSimulating ? "Running Inference..." : "Run Test Prompt"}</Text>
+              <Text style={S.runBtnText}>{isSimulating ? "Preparing..." : "Preview Prompt"}</Text>
             </TouchableOpacity>
 
             {promptLabResult ? (
               <View style={S.resultBox}>
-                <Text style={S.resultLabel}>OUTPUT RESULT (ON-DEVICE)</Text>
+                <Text style={S.resultLabel}>Preview</Text>
                 <Text style={S.resultText}>{promptLabResult}</Text>
               </View>
             ) : null}
@@ -229,13 +156,13 @@ const S = StyleSheet.create({
     backgroundColor: GColor.bg,
   },
   appBar: {
-    height: 56,
+    height: 58,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: GColor.border,
   },
   appBarLeft: {
     flexDirection: 'row',
@@ -247,13 +174,16 @@ const S = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
+    borderRadius: 12,
+    backgroundColor: GColor.surface,
+    borderWidth: 1,
+    borderColor: GColor.border,
   },
   appBarTitle: {
     color: GColor.textPrimary,
-    fontSize: 20,
-    fontWeight: '500',
-    letterSpacing: -0.2,
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: 0,
     fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
   },
   scroll: {
@@ -261,43 +191,67 @@ const S = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 18,
+  },
+  intro: {
+    marginBottom: 18,
+    gap: 5,
+  },
+  introTitle: {
+    color: GColor.textPrimary,
+    fontSize: 26,
+    fontWeight: '800',
+  },
+  introBody: {
+    color: GColor.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    rowGap: 16,
+    rowGap: 12,
   },
   card: {
     width: CARD_WIDTH,
     backgroundColor: GColor.surface,
-    borderRadius: 28,
-    padding: 20,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    minHeight: 180,
+    borderColor: GColor.border,
+    minHeight: 148,
     justifyContent: 'flex-start',
   },
   cardHeader: {
-    marginBottom: 16,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusPill: {
+    backgroundColor: GColor.surfaceHigh,
+    borderColor: GColor.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
   cardSub: {
-    color: GColor.textSecondary,
-    fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 4,
-    letterSpacing: 0.2,
+    color: GColor.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0,
   },
   cardTitle: {
     color: GColor.textPrimary,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     marginBottom: 6,
-    letterSpacing: -0.3,
+    letterSpacing: 0,
   },
   cardDesc: {
-    color: GColor.textSecondary,
+    color: GColor.textMuted,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '400',
@@ -310,11 +264,11 @@ const S = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: GColor.surface,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
     padding: 24,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.1)',
+    borderTopColor: GColor.border,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -325,13 +279,13 @@ const S = StyleSheet.create({
   modalTitle: {
     color: GColor.textPrimary,
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   modalCloseBtn: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    backgroundColor: GColor.surfaceHigh,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -343,10 +297,10 @@ const S = StyleSheet.create({
   },
   inputBoxWrap: {
     backgroundColor: GColor.bg,
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: GColor.border,
     marginBottom: 16,
   },
   promptInput: {
@@ -357,7 +311,7 @@ const S = StyleSheet.create({
   },
   runBtn: {
     backgroundColor: GColor.blue,
-    borderRadius: 24,
+    borderRadius: 14,
     paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
@@ -372,12 +326,12 @@ const S = StyleSheet.create({
   runBtnText: {
     color: '#FFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   resultBox: {
     marginTop: 20,
     backgroundColor: 'rgba(52, 168, 83, 0.1)',
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 16,
     borderWidth: 1,
     borderColor: 'rgba(52, 168, 83, 0.3)',

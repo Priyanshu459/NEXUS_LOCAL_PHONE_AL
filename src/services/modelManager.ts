@@ -1,7 +1,21 @@
 import RNFS from 'react-native-fs';
 
+const FALLBACK_MODEL_FILENAME = 'model.gguf';
+
+export const getModelFilenameFromUrl = (url: string): string => {
+  const rawName = url.split('/').pop()?.split('?')[0] || FALLBACK_MODEL_FILENAME;
+  const decodedName = decodeURIComponent(rawName);
+  const safeName = decodedName.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  if (!safeName.toLowerCase().endsWith('.gguf')) {
+    return FALLBACK_MODEL_FILENAME;
+  }
+
+  return safeName || FALLBACK_MODEL_FILENAME;
+};
+
 export const getModelPath = (filename: string) => {
-  return `${RNFS.DocumentDirectoryPath}/${filename}`;
+  return `${RNFS.DocumentDirectoryPath}/${getModelFilenameFromUrl(filename)}`;
 };
 
 export const checkModelExists = async (filename: string) => {
@@ -30,7 +44,8 @@ export const downloadModel = async (
   filename: string,
   onProgress: (progress: number) => void
 ): Promise<string> => {
-  const path = getModelPath(filename);
+  const safeFilename = getModelFilenameFromUrl(filename);
+  const path = getModelPath(safeFilename);
   const tmpPath = `${path}.tmp`;
   
   if (await RNFS.exists(path)) {
@@ -47,8 +62,10 @@ export const downloadModel = async (
       fromUrl: url,
       toFile: tmpPath,
       progress: (res) => {
-        const percentage = (res.bytesWritten / res.contentLength) * 100;
-        onProgress(percentage);
+        if (res.contentLength > 0) {
+          const percentage = Math.min(100, Math.max(0, (res.bytesWritten / res.contentLength) * 100));
+          onProgress(percentage);
+        }
       },
       progressDivider: 1,
     });
@@ -60,8 +77,12 @@ export const downloadModel = async (
       if (res.statusCode === 200) {
         // Move tmp file to final destination
         await RNFS.moveFile(tmpPath, path);
+        onProgress(100);
         resolve(path);
       } else {
+        if (await RNFS.exists(tmpPath)) {
+          await RNFS.unlink(tmpPath);
+        }
         reject(new Error(`Failed to download: ${res.statusCode}`));
       }
     }).catch((err) => {

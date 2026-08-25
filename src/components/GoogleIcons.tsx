@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
+import { MoonBrandDarkBase64 } from '../assets/branding/BrandAssets';
 
 // Nexus AI Studio Dark & Neon Theme Colors
 export const GColor = {
@@ -31,9 +32,9 @@ export function NexusAIEmblem({ size = 24 }: { size?: number }) {
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', borderRadius: size / 2, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(0, 242, 254, 0.4)', shadowColor: '#00F2FE', shadowOpacity: 0.6, shadowRadius: 6, elevation: 4 }}>
       <Image 
-        source={require('../assets/moon_icon.png')} 
+        source={{ uri: MoonBrandDarkBase64 }} 
         style={{ width: size, height: size }} 
-        resizeMode="cover" 
+        resizeMode="contain" 
       />
     </View>
   );
