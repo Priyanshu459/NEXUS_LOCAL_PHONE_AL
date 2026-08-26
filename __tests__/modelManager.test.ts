@@ -1,5 +1,10 @@
 import RNFS from 'react-native-fs';
-import { downloadModel, getModelFilenameFromUrl, getModelPath } from '../src/services/modelManager';
+import {
+  downloadModel,
+  getModelFilenameFromUrl,
+  getModelPath,
+  validateGgufDownloadUrl,
+} from '../src/services/modelManager';
 
 describe('modelManager', () => {
   beforeEach(() => {
@@ -7,25 +12,53 @@ describe('modelManager', () => {
   });
 
   it('sanitizes model filenames from URLs', () => {
-    expect(getModelFilenameFromUrl('https://example.com/models/My Model%201.gguf?download=true')).toBe('My_Model_1.gguf');
+    expect(
+      getModelFilenameFromUrl(
+        'https://example.com/models/My Model%201.gguf?download=true',
+      ),
+    ).toBe('My_Model_1.gguf');
     expect(getModelFilenameFromUrl('../secret.txt')).toBe('model.gguf');
     expect(getModelPath('../secret.gguf')).toBe('/tmp/secret.gguf');
+  });
+
+  it('accepts only direct HTTPS Hugging Face GGUF URLs', () => {
+    expect(
+      validateGgufDownloadUrl(
+        'https://huggingface.co/org/repo/resolve/main/model.gguf?download=true',
+      ),
+    ).toBeNull();
+    expect(
+      validateGgufDownloadUrl('http://huggingface.co/org/model.gguf'),
+    ).toMatch(/HTTPS/);
+    expect(validateGgufDownloadUrl('https://example.com/model.gguf')).toMatch(
+      /huggingface/,
+    );
+    expect(validateGgufDownloadUrl('https://huggingface.co/org/repo')).toMatch(
+      /\.gguf/,
+    );
   });
 
   it('moves a successful download into place and reports completion', async () => {
     const progress = jest.fn();
     (RNFS.exists as jest.Mock).mockResolvedValue(false);
-    (RNFS.downloadFile as jest.Mock).mockImplementation(({ progress: onProgress }) => {
-      onProgress({ bytesWritten: 50, contentLength: 100 });
-      return {
-        jobId: 9,
-        promise: Promise.resolve({ statusCode: 200 }),
-      };
-    });
+    (RNFS.downloadFile as jest.Mock).mockImplementation(
+      ({ progress: onProgress }) => {
+        onProgress({ bytesWritten: 50, contentLength: 100 });
+        return {
+          jobId: 9,
+          promise: Promise.resolve({ statusCode: 200 }),
+        };
+      },
+    );
 
-    await expect(downloadModel('https://example.com/model.gguf', 'model.gguf', progress)).resolves.toBe('/tmp/model.gguf');
+    await expect(
+      downloadModel('https://example.com/model.gguf', 'model.gguf', progress),
+    ).resolves.toBe('/tmp/model.gguf');
 
-    expect(RNFS.moveFile).toHaveBeenCalledWith('/tmp/model.gguf.tmp', '/tmp/model.gguf');
+    expect(RNFS.moveFile).toHaveBeenCalledWith(
+      '/tmp/model.gguf.tmp',
+      '/tmp/model.gguf',
+    );
     expect(progress).toHaveBeenLastCalledWith(100);
   });
 
@@ -39,7 +72,9 @@ describe('modelManager', () => {
       promise: Promise.resolve({ statusCode: 500 }),
     });
 
-    await expect(downloadModel('https://example.com/bad.gguf', 'bad.gguf', jest.fn())).rejects.toThrow('500');
+    await expect(
+      downloadModel('https://example.com/bad.gguf', 'bad.gguf', jest.fn()),
+    ).rejects.toThrow('500');
 
     expect(RNFS.unlink).toHaveBeenCalledWith('/tmp/bad.gguf.tmp');
   });

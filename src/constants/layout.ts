@@ -1,4 +1,3 @@
 export const DOCK_HEIGHT = 64;
 export const DOCK_MARGIN = 16;
 export const DOCK_RESERVED_SPACE = DOCK_HEIGHT + DOCK_MARGIN + 32;
-export const CONTEXTUAL_ACTION_HEIGHT = 96;

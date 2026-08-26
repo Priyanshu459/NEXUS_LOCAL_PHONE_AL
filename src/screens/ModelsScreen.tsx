@@ -1,249 +1,427 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppHeader } from '../components/AppHeader';
 import { AVAILABLE_MODELS } from '../constants/models';
+import { DOCK_RESERVED_SPACE } from '../constants/layout';
+import { Theme } from '../constants/theme';
 import { getSettings, saveSettings } from '../services/storage';
-import { checkModelExists, downloadModel, cancelDownload, deleteModel, getModelFilenameFromUrl } from '../services/modelManager';
-import { ContextualBottomAction } from '../components/ContextualBottomAction';
-import MoonLogo from '../components/MoonLogo';
-import { CONTEXTUAL_ACTION_HEIGHT, DOCK_HEIGHT, DOCK_RESERVED_SPACE } from '../constants/layout';
+import {
+  cancelDownload,
+  checkModelExists,
+  deleteModel,
+  downloadModel,
+  getModelFilenameFromUrl,
+} from '../services/modelManager';
 
-const C = {
-  bg: '#131314',
-  surface: '#1E1F22',
-  border: 'rgba(255, 255, 255, 0.08)',
-  textPrimary: '#F2F2F2',
-  textSecondary: '#9AA0A6',
-  accent: '#4285F4',
-  red: '#EA4335',
-  green: '#34A853',
-};
-
-const VertexModelCard = memo(({ model, isSelected, onPress, index }: any) => {
-  const scale = useRef(new Animated.Value(0.95)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.delay(index * 70),
-      Animated.parallel([
-        Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 65, friction: 9 }),
-        Animated.timing(opacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-      ]),
-    ]).start();
-  }, [index, opacity, scale]);
-
-  return (
-    <Animated.View style={{ opacity, transform: [{ scale }], marginBottom: 14 }}>
-      <TouchableOpacity 
-        activeOpacity={0.8}
-        onPress={onPress}
-        style={[
-          styles.storeCard, 
-          { borderColor: isSelected ? '#4285F4' : 'rgba(255, 255, 255, 0.09)', borderWidth: isSelected ? 1.5 : 1, padding: 18 },
-          isSelected && { backgroundColor: '#1E293B' }
-        ]}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 100, backgroundColor: model.color + '20', borderWidth: 1, borderColor: model.color + '60', flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: model.color }} />
-              <Text style={{ color: model.color, fontSize: 11, fontWeight: '800', letterSpacing: 0.4 }}>{model.provider.toUpperCase()}</Text>
-            </View>
-            {!!model.badge && (
-              <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 100, backgroundColor: 'rgba(255, 255, 255, 0.07)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.12)' }}>
-                <Text style={{ color: '#E2E8F0', fontSize: 11, fontWeight: '700' }}>{model.badge}</Text>
-              </View>
-            )}
-          </View>
-          <View style={{ backgroundColor: isSelected ? '#4285F4' : 'rgba(66, 133, 244, 0.18)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-            <Text style={{ color: isSelected ? '#FFFFFF' : '#60A5FA', fontSize: 11, fontWeight: '800' }}>{model.size}</Text>
-          </View>
-        </View>
-
-        <View style={{ marginBottom: 12 }}>
-          <Text style={{ fontSize: 19, fontWeight: '800', color: '#F8FAFC', letterSpacing: -0.3, marginBottom: 5 }}>{model.name}</Text>
-          <Text style={{ fontSize: 13, color: '#94A3B8', lineHeight: 18 }} numberOfLines={2}>{model.desc}</Text>
-        </View>
-
-        {!!model.tags && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255, 255, 255, 0.06)' }}>
-            {model.tags.map((tag: string, tIdx: number) => (
-              <View key={tIdx} style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(255, 255, 255, 0.04)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.08)' }}>
-                <Text style={{ color: '#CBD5E1', fontSize: 11, fontWeight: '600' }}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </TouchableOpacity>
-    </Animated.View>
-  );
-});
+type InstallationMap = Record<string, boolean>;
 
 export function ModelsScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState(getSettings());
-  const [currentModelUrl, setCurrentModelUrl] = useState(settings.modelUrl);
+  const [installed, setInstalled] = useState<InstallationMap>({});
+  const [checking, setChecking] = useState(true);
+  const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
 
-  // Sync settings when focusing
+  const refreshInstallations = useCallback(async () => {
+    setChecking(true);
+    const entries = await Promise.all(
+      AVAILABLE_MODELS.map(
+        async model =>
+          [
+            model.url,
+            await checkModelExists(getModelFilenameFromUrl(model.url)),
+          ] as const,
+      ),
+    );
+    setInstalled(Object.fromEntries(entries));
+    setSettings(getSettings());
+    setChecking(false);
+  }, []);
+
   useEffect(() => {
-    const unsub = navigation.addListener('focus', () => {
-      const s = getSettings();
-      setSettings(s);
-      setCurrentModelUrl(s.modelUrl);
-      checkInstallation(s.modelUrl);
-    });
-    return unsub;
-  }, [navigation]);
+    refreshInstallations();
+    return navigation.addListener('focus', refreshInstallations);
+  }, [navigation, refreshInstallations]);
 
-  useEffect(() => {
-    checkInstallation(currentModelUrl);
-  }, [currentModelUrl]);
-
-  const checkInstallation = async (url: string) => {
-    const filename = url.split('/').pop()?.split('?')[0] || 'model.gguf';
-    const exists = await checkModelExists(filename);
-    setIsInstalled(exists);
+  const setActive = (url: string) => {
+    if (!installed[url]) return;
+    const next = { ...getSettings(), modelUrl: url };
+    saveSettings(next);
+    setSettings(next);
   };
 
-  const handleDownload = async (url: string) => {
-    setIsDownloading(true);
+  const startDownload = async (url: string) => {
+    if (downloadingUrl) return;
+    setDownloadingUrl(url);
     setDownloadProgress(0);
-    const filename = url.split('/').pop()?.split('?')[0] || 'model.gguf';
-    
     try {
-      await downloadModel(url, filename, p => setDownloadProgress(p));
-      setIsInstalled(true);
-      // Auto-set as active if they just downloaded it
-      selectModel(url);
-    } catch (e: any) {
-      if (!e?.message?.includes('canceled')) {
-        Alert.alert("Download Failed", "There was an error downloading the model.");
+      await downloadModel(
+        url,
+        getModelFilenameFromUrl(url),
+        setDownloadProgress,
+      );
+      setInstalled(previous => ({ ...previous, [url]: true }));
+      const next = { ...getSettings(), modelUrl: url };
+      saveSettings(next);
+      setSettings(next);
+    } catch (error: any) {
+      if (!String(error?.message).toLowerCase().includes('cancel')) {
+        Alert.alert(
+          'Download failed',
+          'The model could not be downloaded. Check your connection and available storage, then try again.',
+        );
       }
     } finally {
-      setIsDownloading(false);
+      setDownloadingUrl(null);
+      setDownloadProgress(0);
     }
   };
 
-  const handleCancelDownload = () => {
+  const stopDownload = () => {
     cancelDownload();
-    setIsDownloading(false);
+    setDownloadingUrl(null);
+    setDownloadProgress(0);
   };
 
-  const selectModel = (url: string) => {
-    setCurrentModelUrl(url);
-    const newSettings = { ...settings, modelUrl: url };
-    setSettings(newSettings);
-    saveSettings(newSettings);
-  };
-
-  const handleDelete = async (url: string) => {
-    const filename = url.split('/').pop()?.split('?')[0] || 'model.gguf';
-    await deleteModel(filename);
-    setIsInstalled(false);
-  };
-
-  const selectedModelInfo = AVAILABLE_MODELS.find(m => m.url === currentModelUrl);
-  const selectedModelName = selectedModelInfo?.name || getModelFilenameFromUrl(currentModelUrl);
-  const selectedModelSize = selectedModelInfo?.size || 'Custom GGUF';
-
-  const getContextualState = () => {
-    if (isDownloading) {
-      return {
-        title: `Downloading ${selectedModelName}`,
-        subtitle: `Please keep the app open`,
-        progress: downloadProgress,
-        primaryAction: { label: 'Cancel', onPress: handleCancelDownload, color: C.red }
-      };
+  const confirmRemoval = (model: (typeof AVAILABLE_MODELS)[number]) => {
+    if (settings.modelUrl === model.url) {
+      Alert.alert(
+        'Active model cannot be removed',
+        `Select another installed model before removing ${model.name}.`,
+      );
+      return;
     }
-    
-    if (isInstalled && currentModelUrl === settings.modelUrl) {
-      return {
-        title: selectedModelName,
-        subtitle: `${selectedModelSize} · Active model · Ready for chat`,
-        primaryAction: { label: 'Delete', onPress: () => handleDelete(currentModelUrl), color: C.red }
-      };
-    }
-
-    if (!isInstalled) {
-      return {
-        title: selectedModelName,
-        subtitle: `Size: ${selectedModelSize}`,
-        primaryAction: { label: 'Download', onPress: () => handleDownload(currentModelUrl) }
-      };
-    }
-
-    return null;
+    Alert.alert(
+      `Remove ${model.name}?`,
+      `This recovers approximately ${model.size} of storage. You will need internet access to download the model again.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove model',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteModel(getModelFilenameFromUrl(model.url));
+              setInstalled(previous => ({ ...previous, [model.url]: false }));
+            } catch {
+              Alert.alert(
+                'Could not remove model',
+                'The model file was not changed. Please try again.',
+              );
+            }
+          },
+        },
+      ],
+    );
   };
-
-  const contextState = getContextualState();
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <View style={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <MoonLogo size={44} variant="light" />
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={{ color: C.textPrimary, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 }}>Model Store</Text>
-              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: 'rgba(255, 255, 255, 0.05)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.1)' }}>
-                <Text style={{ color: '#E2E8F0', fontSize: 10, fontWeight: '800' }}>ON-DEVICE</Text>
-              </View>
-            </View>
-            <Text style={{ color: C.textSecondary, fontSize: 13 }}>Downloads require internet. Chat runs locally after setup.</Text>
-          </View>
-        </View>
-      </View>
-
-      <ScrollView 
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + DOCK_RESERVED_SPACE + CONTEXTUAL_ACTION_HEIGHT }}
+      <AppHeader
+        title="Model Store"
+        subtitle="Downloads need internet. Compatible GGUF models run chat on this device."
+        onMenuPress={() => navigation.navigate('Settings')}
+      />
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + DOCK_RESERVED_SPACE },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {AVAILABLE_MODELS.map((model, idx) => (
-          <VertexModelCard
-            key={model.id}
-            model={model}
-            index={idx}
-            isSelected={currentModelUrl === model.url}
-            onPress={() => selectModel(model.url)}
-          />
-        ))}
+        <View style={styles.notice} accessibilityRole="summary">
+          <Text style={styles.noticeTitle}>Transparent local setup</Text>
+          <Text style={styles.noticeText}>
+            Choose a quantized GGUF model that fits your device storage and
+            memory. Actual memory use depends on the model and context length.
+          </Text>
+        </View>
 
-        <TouchableOpacity 
-          style={styles.customUrlBtn} 
-          onPress={() => navigation.navigate('Settings')} 
+        {AVAILABLE_MODELS.map(model => {
+          const isActive = settings.modelUrl === model.url;
+          const isInstalled = !!installed[model.url];
+          const isDownloading = downloadingUrl === model.url;
+          const stateLabel = checking
+            ? 'Checking'
+            : isDownloading
+            ? `Downloading ${Math.round(downloadProgress)}%`
+            : isActive && isInstalled
+            ? 'Active'
+            : isInstalled
+            ? 'Installed'
+            : 'Available';
+          return (
+            <View
+              key={model.id}
+              style={[
+                styles.card,
+                isActive && isInstalled && styles.activeCard,
+              ]}
+            >
+              <View style={styles.cardTopRow}>
+                <View style={styles.providerPill}>
+                  <Text style={styles.providerText}>{model.provider}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.statePill,
+                    isActive && isInstalled && styles.activePill,
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.stateDot,
+                      {
+                        backgroundColor:
+                          isActive && isInstalled
+                            ? Theme.color.success
+                            : isDownloading
+                            ? Theme.color.warning
+                            : Theme.color.textMuted,
+                      },
+                    ]}
+                  />
+                  <Text style={styles.stateText}>{stateLabel}</Text>
+                </View>
+              </View>
+              <Text style={styles.modelName}>{model.name}</Text>
+              <Text style={styles.description}>{model.desc}</Text>
+              <View style={styles.metadata}>
+                <Text style={styles.metadataText}>{model.size}</Text>
+                {model.tags.map(tag => (
+                  <Text key={tag} style={styles.metadataText}>
+                    {tag}
+                  </Text>
+                ))}
+              </View>
+              {isDownloading ? (
+                <View
+                  style={styles.progressTrack}
+                  accessibilityRole="progressbar"
+                  accessibilityValue={{
+                    min: 0,
+                    max: 100,
+                    now: downloadProgress,
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${downloadProgress}%` },
+                    ]}
+                  />
+                </View>
+              ) : null}
+              <View style={styles.actions}>
+                {!isInstalled ? (
+                  <TouchableOpacity
+                    style={[
+                      styles.primaryButton,
+                      (checking || !!downloadingUrl) && styles.disabledButton,
+                    ]}
+                    onPress={() =>
+                      isDownloading ? stopDownload() : startDownload(model.url)
+                    }
+                    disabled={checking || (!!downloadingUrl && !isDownloading)}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      {isDownloading ? 'Cancel download' : 'Download'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : isActive ? (
+                  <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={() => navigation.navigate('Chat')}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.primaryButtonText}>
+                      Chat with this model
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.primaryButton}
+                    onPress={() => setActive(model.url)}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.primaryButtonText}>Use model</Text>
+                  </TouchableOpacity>
+                )}
+                {isInstalled ? (
+                  <TouchableOpacity
+                    style={styles.secondaryButton}
+                    onPress={() => confirmRemoval(model)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`More options for ${model.name}`}
+                  >
+                    <Text style={styles.secondaryButtonText}>Remove…</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          );
+        })}
+
+        <TouchableOpacity
+          style={styles.customButton}
+          onPress={() => navigation.navigate('Settings')}
+          accessibilityRole="button"
           activeOpacity={0.7}
         >
-          <Text style={styles.customUrlBtnText}>Paste Custom HuggingFace URL</Text>
+          <Text style={styles.customTitle}>Add model from Hugging Face</Text>
+          <Text style={styles.customDescription}>
+            Paste a direct HTTPS link to a quantized .gguf file. Repository
+            pages and non-GGUF files are not supported.
+          </Text>
         </TouchableOpacity>
       </ScrollView>
-
-      {contextState && (
-        <ContextualBottomAction 
-          title={contextState.title}
-          subtitle={contextState.subtitle}
-          progress={contextState.progress}
-          primaryAction={contextState.primaryAction}
-          bottomOffset={DOCK_HEIGHT + 18}
-        />
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
-  storeCard: {
-    backgroundColor: C.surface, borderRadius: 18,
-    borderWidth: 1, borderColor: C.border,
+  screen: { flex: 1, backgroundColor: Theme.color.background },
+  content: { padding: Theme.space.lg, gap: Theme.space.md },
+  notice: {
+    backgroundColor: Theme.color.accentSoft,
+    borderRadius: Theme.radius.md,
+    padding: Theme.space.lg,
   },
-  customUrlBtn: {
-    backgroundColor: C.surface, borderRadius: 18, padding: 16,
-    borderWidth: 1, borderColor: C.border, borderStyle: 'dashed',
-    alignItems: 'center', marginTop: 10, marginBottom: 20
+  noticeTitle: { color: Theme.color.text, fontSize: 14, fontWeight: '800' },
+  noticeText: {
+    color: Theme.color.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
   },
-  customUrlBtnText: { color: C.textSecondary, fontSize: 14, fontWeight: '600' },
+  card: {
+    backgroundColor: Theme.color.surface,
+    borderRadius: Theme.radius.lg,
+    borderWidth: 1,
+    borderColor: Theme.color.border,
+    padding: Theme.space.lg,
+  },
+  activeCard: { borderColor: Theme.color.accent, backgroundColor: '#1D2030' },
+  cardTopRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Theme.space.sm,
+  },
+  providerPill: {
+    backgroundColor: Theme.color.surfaceRaised,
+    borderRadius: Theme.radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  providerText: {
+    color: Theme.color.textSecondary,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  statePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: Theme.radius.pill,
+    borderWidth: 1,
+    borderColor: Theme.color.border,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  activePill: { borderColor: Theme.color.success },
+  stateDot: { width: 7, height: 7, borderRadius: 4 },
+  stateText: { color: Theme.color.text, fontSize: 11, fontWeight: '800' },
+  modelName: {
+    color: Theme.color.text,
+    fontSize: 19,
+    fontWeight: '800',
+    marginTop: Theme.space.md,
+  },
+  description: {
+    color: Theme.color.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
+  },
+  metadata: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: Theme.space.md,
+  },
+  metadataText: {
+    color: Theme.color.textSecondary,
+    fontSize: 11,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: Theme.color.border,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Theme.color.surfaceRaised,
+    overflow: 'hidden',
+    marginTop: Theme.space.md,
+  },
+  progressFill: { height: '100%', backgroundColor: Theme.color.accent },
+  actions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Theme.space.sm,
+    marginTop: Theme.space.lg,
+  },
+  primaryButton: {
+    minHeight: Theme.touchTarget,
+    flexGrow: 1,
+    backgroundColor: Theme.color.accent,
+    borderRadius: Theme.radius.md,
+    paddingHorizontal: Theme.space.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  disabledButton: { opacity: 0.45 },
+  secondaryButton: {
+    minHeight: Theme.touchTarget,
+    paddingHorizontal: Theme.space.lg,
+    borderRadius: Theme.radius.md,
+    borderWidth: 1,
+    borderColor: Theme.color.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: Theme.color.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  customButton: {
+    backgroundColor: Theme.color.surface,
+    borderRadius: Theme.radius.lg,
+    borderWidth: 1,
+    borderColor: Theme.color.accent,
+    padding: Theme.space.lg,
+    minHeight: 96,
+  },
+  customTitle: { color: Theme.color.accent, fontSize: 15, fontWeight: '800' },
+  customDescription: {
+    color: Theme.color.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 5,
+  },
 });

@@ -15,9 +15,8 @@ import { MoonDock } from './src/components/MoonDock';
 
 export type RootStackParamList = {
   MainTabs: undefined;
-  Chat: { openModels?: boolean; initialPrompt?: string } | undefined;
+  Chat: { initialPrompt?: string } | undefined;
   Settings: undefined;
-  Gallery: undefined; // fallback if directly routed
 };
 
 export type MainTabParamList = {
@@ -55,7 +54,11 @@ function App(): React.JSX.Element {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor="#131314" />
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName="MainTabs"
@@ -65,11 +68,11 @@ function App(): React.JSX.Element {
             contentStyle: {
               backgroundColor: '#131314',
             },
-          }}>
+          }}
+        >
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Chat" component={ChatScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="Gallery" component={GalleryScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

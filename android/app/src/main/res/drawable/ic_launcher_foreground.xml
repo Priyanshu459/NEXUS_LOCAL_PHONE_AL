@@ -4,18 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Official Moonlight AI website icon. -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,11a43,43 0,1 0,0,86a43,43 0,1 0,0,-86"/>
-
-    <path
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#0A0B0E"
-        android:strokeWidth="4.22"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M67.09,39.88a13.37,13.37 0,1 1,-14.07 -14.06c0.6,-0.04 0.92,0.69 0.6,1.2a8.91,8.91 0,0 0,12.28 12.28c0.51,-0.32 1.22,-0.01 1.2,0.6"/>
-
+    <group
+        android:translateX="22"
+        android:translateY="22">
+        <!-- Circle -->
+        <path
+            android:pathData="M32,3A29,29 0 1,0 32,61A29,29 0 1,0 32,3z"
+            android:fillColor="#ffffff"/>
+        <!-- Moon -->
+        <group
+            android:translateX="10"
+            android:translateY="10"
+            android:scaleX="1.833333"
+            android:scaleY="1.833333">
+            <path
+                android:pathData="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"
+                android:strokeColor="#0a0b0e"
+                android:strokeWidth="2.5"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round" />
+        </group>
+    </group>
 </vector>

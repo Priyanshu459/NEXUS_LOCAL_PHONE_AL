@@ -1,7 +1,7 @@
 /**
  * MoonlightSplash — Animated splash screen for Moonlight AI
  *
- * Uses the official brand icon (moonlight-icon.png) as the sole visual element.
+ * Uses the shared adaptive-launcher brand artwork as the sole visual element.
  *
  * Animation sequence (total ~1.6s):
  *   0ms    — opacity 0, scale 0.88
@@ -27,7 +27,7 @@ import {
   View,
   Text,
 } from 'react-native';
-import MoonLogo from './MoonLogo';
+import MoonlightBrandIcon, { MOONLIGHT_BRAND_SIZE } from './MoonlightBrandIcon';
 
 interface MoonlightSplashProps {
   onFinish: () => void;
@@ -36,7 +36,7 @@ interface MoonlightSplashProps {
 const MoonlightSplash: React.FC<MoonlightSplashProps> = ({ onFinish }) => {
   // Animation values
   const opacity = useRef(new Animated.Value(0)).current;
-  const scale   = useRef(new Animated.Value(0.88)).current;
+  const scale = useRef(new Animated.Value(0.88)).current;
 
   useEffect(() => {
     // Phase 1: Fade in + scale up (0 → 600ms)
@@ -94,11 +94,12 @@ const MoonlightSplash: React.FC<MoonlightSplashProps> = ({ onFinish }) => {
         barStyle="light-content"
       />
       <Animated.View
-        style={[
-          styles.logoWrapper,
-          { opacity, transform: [{ scale }] },
-        ]}>
-        <MoonLogo size={120} variant="light" style={styles.logo} />
+        style={[styles.logoWrapper, { opacity, transform: [{ scale }] }]}
+      >
+        <MoonlightBrandIcon
+          size={MOONLIGHT_BRAND_SIZE.splash}
+          style={styles.logo}
+        />
         <Text style={styles.appName}>Moonlight AI</Text>
         <Text style={styles.developer}>Private AI for Android</Text>
         <Text style={styles.status}>Preparing local AI...</Text>
@@ -110,7 +111,7 @@ const MoonlightSplash: React.FC<MoonlightSplashProps> = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F1014',   // App primary dark surface
+    backgroundColor: '#0F1014', // App primary dark surface
     alignItems: 'center',
     justifyContent: 'center',
   },

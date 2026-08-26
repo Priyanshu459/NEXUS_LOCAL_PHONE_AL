@@ -1,353 +1,165 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  Dimensions, Alert, Modal, TextInput, Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GColor, MoonlightAIEmblem, MenuIcon, GalleryCardIcon, SparklesIcon } from '../components/GoogleIcons';
+import { AppHeader } from '../components/AppHeader';
+import { GalleryCardIcon, VaultIcon } from '../components/GoogleIcons';
 import { DOCK_RESERVED_SPACE } from '../constants/layout';
+import { Theme } from '../constants/theme';
 
-
-
-const { width: W } = Dimensions.get('window');
-const CARD_WIDTH = (W - 48) / 2;
-const MODULES = [
-  { id: 'ai_chat', type: 'ai_chat', color: GColor.blue, status: 'Ready', title: 'Chat', desc: 'Talk with the selected local model.' },
-  { id: 'models', type: 'models', color: GColor.green, status: 'Ready', title: 'Models', desc: 'Choose and download GGUF models.' },
-  { id: 'prompt_lab', type: 'prompt_lab', color: GColor.coral, status: 'Preview', title: 'Prompt Lab', desc: 'Try focused prompt templates.' },
-  { id: 'settings', type: 'settings', color: GColor.blue, status: 'System', title: 'Settings', desc: 'Tune model and generation options.' },
-  { id: 'audio_scribe', type: 'audio_scribe', color: GColor.green, status: 'Chat', title: 'Voice Input', desc: 'Speak into the chat composer.' },
-  { id: 'ask_image', type: 'ask_image', color: GColor.red, status: 'Roadmap', title: 'Images', desc: 'Vision support is planned.' },
-  { id: 'prompt_templates', type: 'agent_skills', color: GColor.yellow, status: 'Prompt', title: 'Prompt Templates', desc: 'Draft structured prompts before sending them to chat.' },
-  { id: 'notifications', type: 'notifications', color: GColor.red, status: 'Roadmap', title: 'Notifications', desc: 'Scheduled assistant updates are planned.' },
-];
+const TOOLS = [
+  {
+    id: 'chat',
+    icon: 'ai_chat',
+    title: 'Chat',
+    desc: 'Talk privately with the selected on-device model.',
+  },
+  {
+    id: 'models',
+    icon: 'models',
+    title: 'Models',
+    desc: 'Download, inspect, and activate compatible GGUF models.',
+  },
+  {
+    id: 'settings',
+    icon: 'settings',
+    title: 'Settings',
+    desc: 'Adjust generation, memory, privacy, and storage options.',
+  },
+  {
+    id: 'voice',
+    icon: 'audio_scribe',
+    title: 'Voice Input',
+    desc: 'Open chat and dictate using your device speech service.',
+  },
+] as const;
 
 export function GalleryScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const [showPromptLab, setShowPromptLab] = useState(false);
-  const [promptLabInput, setPromptLabInput] = useState('Summarize the theory of relativity in 2 bullet points.');
-  const [promptLabResult, setPromptLabResult] = useState('');
-  const [isSimulating, setIsSimulating] = useState(false);
+  const { width, fontScale } = useWindowDimensions();
+  const useSingleColumn = width < 380 || fontScale > 1.25;
 
-  const handleCardPress = (id: string) => {
-    if (id === 'ai_chat') {
-      navigation.navigate('Chat');
-    } else if (id === 'settings') {
-      navigation.navigate('Settings');
-    } else if (id === 'models') {
-      // Navigate to chat and prompt user
-      navigation.navigate('Chat', { openModels: true });
-    } else if (id === 'prompt_lab') {
-      setShowPromptLab(true);
-    } else if (id === 'audio_scribe') {
-      Alert.alert("Voice Input", "Switch to Moonlight Chat and tap the microphone icon to use the device speech recognizer.");
-    } else if (id === 'prompt_templates') {
-      Alert.alert("Prompt Templates", "Moonlight AI can draft structured prompts here. Autonomous agents and local plugins are roadmap features.");
-    } else if (id === 'ask_image') {
-      Alert.alert("Images", "Vision model support is coming soon. Current GGUF text models cannot inspect images directly.");
-    } else if (id === 'tiny_garden') {
-      Alert.alert("Tiny Garden", "Welcome to Tiny Garden! An experimental interactive benchmark demonstrating natural language state management on-device.");
-    } else if (id === 'mobile_actions') {
-      Alert.alert("Mobile Actions", "On-device mobile automation benchmark. Designed for secure, zero-latency local execution.");
-    } else if (id === 'notifications') {
-      Alert.alert("Notifications", "Scheduled assistant updates and background workflows are roadmap features.");
-    }
-  };
-
-  const runPromptLab = () => {
-    if (!promptLabInput.trim()) return;
-    setIsSimulating(true);
-    setPromptLabResult('');
-    setTimeout(() => {
-      setPromptLabResult("• Relativity states that space and time are intertwined into a single spacetime fabric, curved by mass and energy.\n• The speed of light in a vacuum is constant for all observers, meaning time slows down and length contracts at speeds approaching light.");
-      setIsSimulating(false);
-    }, 800);
+  const openTool = (id: (typeof TOOLS)[number]['id']) => {
+    if (id === 'models') navigation.navigate('Models');
+    else if (id === 'settings') navigation.navigate('Settings');
+    else navigation.navigate('Chat');
   };
 
   return (
-    <View style={[S.screen, { paddingTop: insets.top }]}>
-      {/* Top App Bar */}
-      <View style={S.appBar}>
-        <View style={S.appBarLeft}>
-          <TouchableOpacity style={S.iconBtn} onPress={() => Alert.alert("Moonlight AI", "Local model runtime powered by llama.rn.")} activeOpacity={0.7}>
-            <MenuIcon />
-          </TouchableOpacity>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <MoonlightAIEmblem size={28} />
-            <Text style={S.appBarTitle}>Tools</Text>
-          </View>
-        </View>
-      </View>
-
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <AppHeader
+        title="Tools"
+        subtitle="Working on-device capabilities"
+        onMenuPress={() => navigation.navigate('Settings')}
+      />
       <ScrollView
-        style={S.scroll}
-        contentContainerStyle={[S.content, { paddingBottom: insets.bottom + DOCK_RESERVED_SPACE }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + DOCK_RESERVED_SPACE },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={S.intro}>
-          <Text style={S.introTitle}>Choose a workspace</Text>
-          <Text style={S.introBody}>Open chat, manage models, or start from a focused task.</Text>
-        </View>
-        <View style={S.grid}>
-          {MODULES.map(module => (
-            <TouchableOpacity key={module.id} style={S.card} onPress={() => handleCardPress(module.id)} activeOpacity={0.82}>
-              <View style={S.cardHeader}>
-                <GalleryCardIcon type={module.type} color={module.color} size={38} />
-                <View style={[S.statusPill, module.status === 'Roadmap' && S.roadmapPill]}>
-                  <Text style={S.cardSub}>{module.status}</Text>
+        <Text style={styles.heading}>Choose what you want to do</Text>
+        <Text style={styles.intro}>
+          Every tool below opens a complete, usable workflow.
+        </Text>
+        <View style={styles.grid}>
+          {TOOLS.map(tool => (
+            <TouchableOpacity
+              key={tool.id}
+              style={[styles.card, useSingleColumn && styles.cardWide]}
+              onPress={() => openTool(tool.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`${tool.title}. ${tool.desc}`}
+              activeOpacity={0.68}
+            >
+              {tool.id === 'models' ? (
+                <View style={styles.modelIcon}>
+                  <VaultIcon active />
                 </View>
+              ) : (
+                <GalleryCardIcon
+                  type={tool.icon}
+                  color={Theme.color.accent}
+                  size={42}
+                />
+              )}
+              <View style={styles.cardCopy}>
+                <Text style={styles.cardTitle}>{tool.title}</Text>
+                <Text style={styles.cardDescription}>{tool.desc}</Text>
               </View>
-              <Text style={S.cardTitle}>{module.title}</Text>
-              <Text style={S.cardDesc}>{module.desc}</Text>
+              <Text style={styles.openLabel}>
+                {tool.id === 'models'
+                  ? 'Manage models'
+                  : tool.id === 'settings'
+                  ? 'Open settings'
+                  : tool.id === 'voice'
+                  ? 'Open voice input'
+                  : 'Start chat'}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
-
-      {/* Prompt Lab Modal */}
-      <Modal visible={showPromptLab} animationType="slide" transparent={true} onRequestClose={() => setShowPromptLab(false)}>
-        <View style={S.modalOverlay}>
-          <View style={[S.modalContainer, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={S.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <GalleryCardIcon type="prompt_lab" color={GColor.red} size={32} />
-                <Text style={S.modalTitle}>Prompt Lab</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowPromptLab(false)} style={S.modalCloseBtn}>
-                <Text style={{ color: GColor.textSecondary, fontSize: 16, fontWeight: '700' }}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={S.modalDesc}>Draft a prompt, then move it into chat when you are ready to run it against your selected model.</Text>
-
-            <View style={S.inputBoxWrap}>
-              <TextInput
-                style={S.promptInput}
-                value={promptLabInput}
-                onChangeText={setPromptLabInput}
-                multiline
-                placeholder="Enter prompt instruction..."
-                placeholderTextColor={GColor.textMuted}
-              />
-            </View>
-
-            <TouchableOpacity style={S.runBtn} onPress={runPromptLab} disabled={isSimulating} activeOpacity={0.8}>
-              <SparklesIcon size={18} />
-              <Text style={S.runBtnText}>{isSimulating ? "Preparing..." : "Preview Prompt"}</Text>
-            </TouchableOpacity>
-
-            {promptLabResult ? (
-              <View style={S.resultBox}>
-                <Text style={S.resultLabel}>Preview</Text>
-                <Text style={S.resultText}>{promptLabResult}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
-const S = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: GColor.bg,
-  },
-  appBar: {
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: GColor.border,
-  },
-  appBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: GColor.border,
-  },
-  appBarTitle: {
-    color: GColor.textPrimary,
-    fontSize: 19,
-    fontWeight: '700',
-    letterSpacing: 0,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif-medium',
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: Theme.color.background },
+  content: { padding: Theme.space.lg },
+  heading: {
+    color: Theme.color.text,
+    fontSize: 24,
+    fontWeight: '800',
+    marginTop: Theme.space.sm,
   },
   intro: {
-    marginBottom: 18,
-    gap: 5,
-  },
-  introTitle: {
-    color: GColor.textPrimary,
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  introBody: {
-    color: GColor.textSecondary,
+    color: Theme.color.textSecondary,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 21,
+    marginTop: 6,
+    marginBottom: Theme.space.lg,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 12,
-  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Theme.space.md },
   card: {
-    width: CARD_WIDTH,
-    backgroundColor: GColor.surface,
-    borderRadius: 16,
-    padding: 16,
+    flexGrow: 1,
+    flexBasis: '46%',
+    minWidth: 150,
+    minHeight: 184,
+    backgroundColor: Theme.color.surface,
+    borderRadius: Theme.radius.lg,
     borderWidth: 1,
-    borderColor: GColor.border,
-    minHeight: 150,
-    justifyContent: 'flex-start',
+    borderColor: Theme.color.border,
+    padding: Theme.space.lg,
   },
-  cardHeader: {
-    marginBottom: 14,
-    flexDirection: 'row',
+  cardWide: { flexBasis: '100%', minHeight: 154 },
+  modelIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: Theme.color.accent,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
-  statusPill: {
-    backgroundColor: GColor.surfaceHigh,
-    borderColor: GColor.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  cardSub: {
-    color: '#B5BAC4',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0,
-  },
-  roadmapPill: {
-    opacity: 0.72,
-  },
-  cardTitle: {
-    color: GColor.textPrimary,
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 6,
-    letterSpacing: 0,
-  },
-  cardDesc: {
-    color: GColor.textMuted,
+  cardCopy: { flex: 1, marginTop: Theme.space.md },
+  cardTitle: { color: Theme.color.text, fontSize: 17, fontWeight: '700' },
+  cardDescription: {
+    color: Theme.color.textSecondary,
     fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '400',
+    lineHeight: 19,
+    marginTop: 5,
   },
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: GColor.surface,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    padding: 24,
-    borderTopWidth: 1,
-    borderTopColor: GColor.border,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  modalTitle: {
-    color: GColor.textPrimary,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: GColor.surfaceHigh,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalDesc: {
-    color: GColor.textSecondary,
-    fontSize: 14,
-    marginBottom: 18,
-    lineHeight: 20,
-  },
-  inputBoxWrap: {
-    backgroundColor: GColor.bg,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: GColor.border,
-    marginBottom: 16,
-  },
-  promptInput: {
-    color: GColor.textPrimary,
-    fontSize: 15,
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  runBtn: {
-    backgroundColor: GColor.blue,
-    borderRadius: 14,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: GColor.blue,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  runBtnText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  resultBox: {
-    marginTop: 20,
-    backgroundColor: 'rgba(52, 168, 83, 0.1)',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 168, 83, 0.3)',
-  },
-  resultLabel: {
-    color: GColor.green,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  resultText: {
-    color: GColor.textPrimary,
-    fontSize: 14,
-    lineHeight: 22,
+  openLabel: {
+    color: Theme.color.accent,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: Theme.space.md,
   },
 });
