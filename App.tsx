@@ -10,6 +10,7 @@ import { SettingsScreen } from './src/screens/SettingsScreen';
 import { GalleryScreen } from './src/screens/GalleryScreen';
 import { WorkspaceScreen } from './src/screens/WorkspaceScreen';
 import { ModelsScreen } from './src/screens/ModelsScreen';
+import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 import MoonlightSplash from './src/components/MoonlightSplash';
 import { MoonDock } from './src/components/MoonDock';
 
@@ -17,6 +18,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   Chat: { initialPrompt?: string } | undefined;
   Settings: undefined;
+  PrivacyPolicy: undefined;
 };
 
 export type MainTabParamList = {
@@ -73,6 +75,7 @@ function App(): React.JSX.Element {
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Chat" component={ChatScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

@@ -375,4 +375,9 @@ Before production release:
 Do not submit this build to production yet.
 
 It is reasonable to move toward an internal test only after fixing release signing, lint, and the Jest teardown crash. It is reasonable to move to closed testing after the privacy policy, Data Safety answers, permission rationale, model attribution, and model integrity checks are complete.
+# Superseded Audit Note
+
+This file has been superseded by the current release-readiness documents in `play-store/`.
+
+Use `play-store/README.md` as the current source of truth. Older notes below may describe pre-hardening failures that have since been fixed or re-tested.
 

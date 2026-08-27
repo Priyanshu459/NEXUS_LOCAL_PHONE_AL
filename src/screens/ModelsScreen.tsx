@@ -33,17 +33,22 @@ export function ModelsScreen({ navigation }: any) {
 
   const refreshInstallations = useCallback(async () => {
     setChecking(true);
+    const savedSettings = getSettings();
+    const urls = AVAILABLE_MODELS.map(model => model.url);
+    if (!urls.includes(savedSettings.modelUrl)) {
+      urls.push(savedSettings.modelUrl);
+    }
     const entries = await Promise.all(
-      AVAILABLE_MODELS.map(
-        async model =>
+      urls.map(
+        async url =>
           [
-            model.url,
-            await checkModelExists(getModelFilenameFromUrl(model.url)),
+            url,
+            await checkModelExists(getModelFilenameFromUrl(url)),
           ] as const,
       ),
     );
     setInstalled(Object.fromEntries(entries));
-    setSettings(getSettings());
+    setSettings(savedSettings);
     setChecking(false);
   }, []);
 
@@ -77,7 +82,8 @@ export function ModelsScreen({ navigation }: any) {
       if (!String(error?.message).toLowerCase().includes('cancel')) {
         Alert.alert(
           'Download failed',
-          'The model could not be downloaded. Check your connection and available storage, then try again.',
+          error?.message ||
+            'The model could not be downloaded. Check your connection and available storage, then try again.',
         );
       }
     } finally {
@@ -85,6 +91,12 @@ export function ModelsScreen({ navigation }: any) {
       setDownloadProgress(0);
     }
   };
+
+  const customModelUrl = AVAILABLE_MODELS.some(
+    model => model.url === settings.modelUrl,
+  )
+    ? null
+    : settings.modelUrl;
 
   const stopDownload = () => {
     cancelDownload();
@@ -272,6 +284,58 @@ export function ModelsScreen({ navigation }: any) {
           );
         })}
 
+        {customModelUrl ? (
+          <View style={[styles.card, installed[customModelUrl] && styles.activeCard]}>
+            <View style={styles.cardTopRow}>
+              <View style={styles.providerPill}>
+                <Text style={styles.providerText}>Hugging Face</Text>
+              </View>
+              <View style={styles.statePill}>
+                <Text style={styles.stateText}>
+                  {downloadingUrl === customModelUrl
+                    ? `Downloading ${Math.round(downloadProgress)}%`
+                    : installed[customModelUrl]
+                    ? 'Installed'
+                    : 'Custom model'}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.modelName}>Saved custom model</Text>
+            <Text style={styles.description} numberOfLines={3}>
+              {customModelUrl}
+            </Text>
+            {downloadingUrl === customModelUrl ? (
+              <View style={styles.progressTrack}>
+                <View
+                  style={[styles.progressFill, { width: `${downloadProgress}%` }]}
+                />
+              </View>
+            ) : null}
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() =>
+                  downloadingUrl === customModelUrl
+                    ? stopDownload()
+                    : installed[customModelUrl]
+                    ? navigation.navigate('Chat')
+                    : startDownload(customModelUrl)
+                }
+                disabled={!!downloadingUrl && downloadingUrl !== customModelUrl}
+                accessibilityRole="button"
+              >
+                <Text style={styles.primaryButtonText}>
+                  {downloadingUrl === customModelUrl
+                    ? 'Cancel download'
+                    : installed[customModelUrl]
+                    ? 'Chat with this model'
+                    : 'Download'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
         <TouchableOpacity
           style={styles.customButton}
           onPress={() => navigation.navigate('Settings')}
@@ -280,8 +344,8 @@ export function ModelsScreen({ navigation }: any) {
         >
           <Text style={styles.customTitle}>Add model from Hugging Face</Text>
           <Text style={styles.customDescription}>
-            Paste a direct HTTPS link to a quantized .gguf file. Repository
-            pages and non-GGUF files are not supported.
+            Paste a repository or direct .gguf link in Settings. Repository,
+            /blob/, and /resolve/ links work.
           </Text>
         </TouchableOpacity>
       </ScrollView>

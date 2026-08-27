@@ -21,6 +21,7 @@ import {
   Modal,
   ScrollView,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -39,7 +40,7 @@ import {
   cancelDownload,
 } from '../services/modelManager';
 import { initLlama, LlamaContext } from 'llama.rn';
-import { NativeModules, PermissionsAndroid } from 'react-native';
+import { NativeModules } from 'react-native';
 import {
   getMemoryContextString,
   addMemory,
@@ -54,6 +55,12 @@ import {
 import MoonlightBrandIcon, {
   MOONLIGHT_BRAND_SIZE,
 } from '../components/MoonlightBrandIcon';
+import {
+  AI_REPORT_CATEGORIES,
+  AiReportCategory,
+  isAiReportingConfigured,
+  submitAiReport,
+} from '../services/aiReportService';
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 type Message = {
   id: string;
@@ -445,7 +452,15 @@ function TypingIndicator() {
 
 // ── Message Bubble ────────────────────────────────────────────────────────
 const MessageBubble = memo(
-  ({ item, isGenerating }: { item: Message; isGenerating: boolean }) => {
+  ({
+    item,
+    isGenerating,
+    onReport,
+  }: {
+    item: Message;
+    isGenerating: boolean;
+    onReport: (message: Message) => void;
+  }) => {
     const anim = useRef(new Animated.Value(0)).current;
     const isUser = item.role === 'user';
 
@@ -528,6 +543,15 @@ const MessageBubble = memo(
                       Copy
                     </Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={S.messageAction}
+                    onPress={() => onReport(item)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel="Report response"
+                  >
+                    <Text style={S.messageActionText}>Report response</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -539,10 +563,187 @@ const MessageBubble = memo(
   (prev, next) => {
     return (
       prev.item.content === next.item.content &&
-      prev.isGenerating === next.isGenerating
+      prev.isGenerating === next.isGenerating &&
+      prev.onReport === next.onReport
     );
   },
 );
+
+function ReportResponseModal({
+  message,
+  onClose,
+}: {
+  message: Message | null;
+  onClose: () => void;
+}) {
+  const reportingConfigured = isAiReportingConfigured();
+  const [category, setCategory] = useState<AiReportCategory>(
+    'Harmful or dangerous',
+  );
+  const [explanation, setExplanation] = useState('');
+  const [previewing, setPreviewing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<{
+    kind: 'success' | 'failure';
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (message) {
+      setCategory('Harmful or dangerous');
+      setExplanation('');
+      setPreviewing(false);
+      setSubmitting(false);
+      setStatus(null);
+    }
+  }, [message]);
+
+  const submit = async () => {
+    if (!message) return;
+    setSubmitting(true);
+    setStatus(null);
+    try {
+      await submitAiReport({
+        responseId: message.id,
+        responseText: message.content,
+        category,
+        explanation,
+      });
+      setStatus({ kind: 'success', text: 'Report submitted. Thank you.' });
+    } catch (error: any) {
+      setStatus({
+        kind: 'failure',
+        text: error?.message ?? 'The report could not be sent. Try again.',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      visible={Boolean(message)}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={S.reportOverlay}>
+        <View style={S.reportSheet}>
+          <View style={S.reportHeader}>
+            <Text style={S.reportTitle}>Report response</Text>
+            <TouchableOpacity onPress={onClose} accessibilityRole="button">
+              <Text style={S.reportClose}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={S.reportScroll}>
+            {!reportingConfigured ? (
+              <>
+                <Text style={S.reportNotice} accessibilityRole="alert">
+                  Response reporting is not currently configured for this build.
+                  No information has been sent.
+                </Text>
+                <TouchableOpacity style={S.reportSecondary} onPress={onClose}>
+                  <Text style={S.reportSecondaryText}>Close</Text>
+                </TouchableOpacity>
+              </>
+            ) : !previewing ? (
+              <>
+                <Text style={S.reportLabel}>Category</Text>
+                {AI_REPORT_CATEGORIES.map(option => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      S.reportCategory,
+                      category === option && S.reportCategorySelected,
+                    ]}
+                    onPress={() => setCategory(option)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: category === option }}
+                  >
+                    <Text style={S.reportCategoryText}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+                <Text style={S.reportLabel}>Optional explanation</Text>
+                <TextInput
+                  style={S.reportExplanation}
+                  value={explanation}
+                  onChangeText={setExplanation}
+                  multiline
+                  maxLength={1000}
+                  placeholder="Add context for the developer"
+                  placeholderTextColor={C.textMuted}
+                />
+                <TouchableOpacity
+                  style={S.reportPrimary}
+                  onPress={() => setPreviewing(true)}
+                >
+                  <Text style={S.reportPrimaryText}>Review report</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={S.reportNotice}>
+                  Only the information below will be sent. The rest of your
+                  conversation, memories, files, model, and device identifiers
+                  are not included.
+                </Text>
+                <Text style={S.reportLabel}>Category</Text>
+                <Text style={S.reportPreviewText}>{category}</Text>
+                <Text style={S.reportLabel}>Reported assistant response</Text>
+                <Text style={S.reportPreviewText}>{message?.content}</Text>
+                {explanation.trim() ? (
+                  <>
+                    <Text style={S.reportLabel}>Your explanation</Text>
+                    <Text style={S.reportPreviewText}>
+                      {explanation.trim()}
+                    </Text>
+                  </>
+                ) : null}
+                {status ? (
+                  <Text
+                    style={
+                      status.kind === 'success'
+                        ? S.reportSuccess
+                        : S.reportFailure
+                    }
+                    accessibilityRole="alert"
+                  >
+                    {status.text}
+                  </Text>
+                ) : null}
+                {status?.kind !== 'success' ? (
+                  <TouchableOpacity
+                    style={[S.reportPrimary, submitting && S.reportDisabled]}
+                    onPress={() => void submit()}
+                    disabled={submitting}
+                  >
+                    <Text style={S.reportPrimaryText}>
+                      {submitting
+                        ? 'Sending…'
+                        : status?.kind === 'failure'
+                        ? 'Retry'
+                        : 'Confirm and send'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={S.reportSecondary}
+                  onPress={() => {
+                    setPreviewing(false);
+                    setStatus(null);
+                  }}
+                  disabled={submitting}
+                >
+                  <Text style={S.reportSecondaryText}>Back</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 // ── Compatible GGUF models ────────────────────────────────────────────────
 const AVAILABLE_MODELS = [
@@ -1095,6 +1296,9 @@ function SetupScreen({
 }: any) {
   const insets = useSafeAreaInsets();
   const [dots, setDots] = useState('.');
+  const isCustomModel = !AVAILABLE_MODELS.some(
+    model => model.url === currentModelUrl,
+  );
 
   // Continuous background wave animation
   const bgWave = useRef(new Animated.Value(0)).current;
@@ -1284,6 +1488,24 @@ function SetupScreen({
           />
         ))}
 
+        {isCustomModel ? (
+          <TouchableOpacity
+            style={[S.customUrlBtn, { borderStyle: 'solid' }]}
+            onPress={() => onDownload(currentModelUrl)}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Download saved Hugging Face model"
+          >
+            <Text style={S.customUrlBtnText}>Download saved custom model</Text>
+            <Text
+              style={{ color: C.textMuted, fontSize: 11, marginTop: 6 }}
+              numberOfLines={2}
+            >
+              {currentModelUrl}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         <TouchableOpacity
           style={S.customUrlBtn}
           onPress={onSettings}
@@ -1435,27 +1657,45 @@ export function ChatScreen({ navigation, route }: Props) {
   const [isAppBooting, setIsAppBooting] = useState(true);
 
   const [voiceModeActive, setVoiceModeActive] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [reportedMessage, setReportedMessage] = useState<Message | null>(null);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () =>
+      setIsKeyboardVisible(true),
+    );
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () =>
+      setIsKeyboardVisible(false),
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const startVoiceInput = async () => {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+    const deviceControl = NativeModules.DeviceControl;
+    if (typeof deviceControl?.startSpeechRecognition !== 'function') {
+      Alert.alert(
+        'Voice input unavailable',
+        'The Android voice-input component is not available in this build.',
       );
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert(
-          'Permission',
-          'Microphone permission is required for voice input.',
-        );
-        return;
-      }
+      return;
+    }
+    try {
       setVoiceModeActive(true);
-      const result = await NativeModules.DeviceControl.startSpeechRecognition();
+      const result = await deviceControl.startSpeechRecognition();
       if (result && result.length > 0) {
         setInputText('');
         handleSendMessage(result);
       }
     } catch (e: any) {
-      console.log('Voice input result:', e?.message);
+      if (e?.code !== 'CANCELLED') {
+        Alert.alert(
+          'Voice input unavailable',
+          e?.message || 'Speech could not be recognized. Please try again.',
+        );
+      }
     } finally {
       setVoiceModeActive(false);
     }
@@ -1571,8 +1811,11 @@ export function ChatScreen({ navigation, route }: Props) {
       urlToDownload.split('/').pop()?.split('?')[0] || 'model.gguf';
 
     try {
-      await downloadModel(urlToDownload, filename, p => setDownloadProgress(p));
-      await initModel(filename);
+      const downloadedPath = await downloadModel(urlToDownload, filename, p =>
+        setDownloadProgress(p),
+      );
+      const downloadedFilename = downloadedPath.split('/').pop() || filename;
+      await initModel(downloadedFilename);
     } catch (e: any) {
       console.error(e);
       if (e.message && e.message.includes('canceled')) {
@@ -1580,7 +1823,8 @@ export function ChatScreen({ navigation, route }: Props) {
       } else {
         Alert.alert(
           'Download Failed',
-          'There was an error downloading the model. Please check your connection and try again.',
+          e?.message ||
+            'There was an error downloading the model. Please check your connection and try again.',
         );
       }
     } finally {
@@ -1739,6 +1983,10 @@ export function ChatScreen({ navigation, route }: Props) {
     [messages],
   );
 
+  const openReport = useCallback((message: Message) => {
+    setReportedMessage(message);
+  }, []);
+
   const renderItem = useCallback(
     ({ item, index }: { item: Message; index: number }) => {
       const isLast = index === filteredMessages.length - 1;
@@ -1747,9 +1995,15 @@ export function ChatScreen({ navigation, route }: Props) {
 
       if (item.role === 'assistant' && item.content === '' && isGenerating)
         return <TypingIndicator />;
-      return <MessageBubble item={item} isGenerating={isCurrentlyGenerating} />;
+      return (
+        <MessageBubble
+          item={item}
+          isGenerating={isCurrentlyGenerating}
+          onReport={openReport}
+        />
+      );
     },
-    [filteredMessages, isGenerating],
+    [filteredMessages, isGenerating, openReport],
   );
 
   if (isAppBooting) {
@@ -1897,7 +2151,8 @@ export function ChatScreen({ navigation, route }: Props) {
 
       <KeyboardAvoidingView
         style={S.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
         <FlatList
           ref={listRef}
@@ -2054,11 +2309,16 @@ export function ChatScreen({ navigation, route }: Props) {
           onPickFile={handlePickFile}
           onVoiceInput={startVoiceInput}
           voiceModeActive={voiceModeActive}
-          insetsBottom={insets.bottom}
+          insetsBottom={isKeyboardVisible ? 0 : insets.bottom}
           externalPrompt={inputText}
           onClearExternalPrompt={() => setInputText('')}
         />
       </KeyboardAvoidingView>
+
+      <ReportResponseModal
+        message={reportedMessage}
+        onClose={() => setReportedMessage(null)}
+      />
 
       {/* ── Model Selector Modal ────────────────────────────────────────── */}
       <Modal
@@ -2216,6 +2476,107 @@ const S = StyleSheet.create({
     borderColor: C.border,
   },
   aiText: { fontSize: 15, color: C.textPrimary, lineHeight: 23 },
+  messageAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: C.surfaceHighlight,
+    borderRadius: 12,
+  },
+  messageActionText: {
+    fontSize: 11,
+    color: C.textSecondary,
+    fontWeight: '600',
+  },
+  reportOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.70)',
+    justifyContent: 'flex-end',
+  },
+  reportSheet: {
+    maxHeight: '88%',
+    backgroundColor: C.surface,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  reportTitle: { color: C.textPrimary, fontSize: 19, fontWeight: '800' },
+  reportClose: { color: C.accent, fontSize: 14, fontWeight: '700' },
+  reportScroll: { flexGrow: 0 },
+  reportLabel: {
+    color: C.textPrimary,
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 14,
+    marginBottom: 7,
+  },
+  reportCategory: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.bg,
+  },
+  reportCategorySelected: {
+    borderColor: C.accent,
+    backgroundColor: C.accentSoft,
+  },
+  reportCategoryText: { color: C.textPrimary, fontSize: 13 },
+  reportExplanation: {
+    minHeight: 92,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.bg,
+    color: C.textPrimary,
+    padding: 12,
+    textAlignVertical: 'top',
+  },
+  reportNotice: {
+    color: C.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: C.bg,
+  },
+  reportPreviewText: {
+    color: C.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: C.bg,
+  },
+  reportPrimary: {
+    marginTop: 18,
+    backgroundColor: C.accent,
+    padding: 13,
+    borderRadius: 11,
+    alignItems: 'center',
+  },
+  reportPrimaryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  reportSecondary: { marginTop: 8, padding: 12, alignItems: 'center' },
+  reportSecondaryText: {
+    color: C.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  reportDisabled: { opacity: 0.55 },
+  reportSuccess: { color: C.green, marginTop: 14, lineHeight: 19 },
+  reportFailure: { color: C.red, marginTop: 14, lineHeight: 19 },
 
   typingBubble: {
     backgroundColor: C.aiBubble,

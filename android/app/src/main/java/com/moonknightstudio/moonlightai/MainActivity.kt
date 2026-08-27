@@ -1,4 +1,4 @@
-package com.localllmapp
+package com.moonknightstudio.moonlightai
 
 import android.os.Bundle
 import com.facebook.react.ReactActivity

@@ -438,8 +438,9 @@ export function SettingsScreen({ navigation }: Props) {
           <View style={styles.hintRow}>
             <View style={styles.hintDotWrap} />
             <Text style={styles.hintText}>
-              Use a direct quantized .gguf URL. Changing it requires a new
-              download.
+              Paste a Hugging Face repository or direct .gguf link. Repository,
+              /blob/, and /resolve/ links are accepted. Changing the URL
+              requires a new download.
             </Text>
           </View>
           <TouchableOpacity
@@ -543,6 +544,14 @@ export function SettingsScreen({ navigation }: Props) {
             into the current chat only. Moonlight AI does not include accounts,
             ad SDKs, or analytics SDKs.
           </Text>
+          <TouchableOpacity
+            style={styles.privacyPolicyButton}
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy Policy"
+          >
+            <Text style={styles.privacyPolicyButtonText}>Privacy Policy</Text>
+          </TouchableOpacity>
         </View>
 
         {/* 5. Voice Input */}
@@ -551,7 +560,8 @@ export function SettingsScreen({ navigation }: Props) {
           <Text style={styles.privacyText}>
             Voice input uses Android's speech recognition service. Depending on
             your device and settings, speech recognition may use network
-            processing.
+            processing. Moonlight AI receives recognized text, not microphone
+            audio.
           </Text>
         </View>
 
@@ -597,6 +607,10 @@ export function SettingsScreen({ navigation }: Props) {
           <MoonlightBrandIcon size={MOONLIGHT_BRAND_SIZE.about} />
           <Text style={styles.aboutName}>Moonlight AI</Text>
           <Text style={styles.aboutSub}>Private AI for Android</Text>
+          <Text style={styles.aiDisclaimer}>
+            AI responses may be inaccurate or inappropriate. Verify important
+            information.
+          </Text>
         </View>
       </Animated.ScrollView>
 
@@ -829,12 +843,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  privacyPolicyButton: {
+    alignSelf: 'flex-start',
+    marginTop: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: C.accentDim,
+  },
+  privacyPolicyButtonText: {
+    color: C.accent,
+    fontSize: 13,
+    fontWeight: '800',
+  },
 
   about: {
     alignItems: 'center',
     gap: 5,
     paddingVertical: 20,
     marginTop: 16,
+  },
+  aiDisclaimer: {
+    color: C.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+    maxWidth: 280,
+    marginTop: 8,
   },
   aboutLogo: {
     width: 40,

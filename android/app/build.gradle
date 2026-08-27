@@ -72,18 +72,27 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+def uploadSigningValues = [
+    storeFile: System.getenv("MOONLIGHT_UPLOAD_STORE_FILE"),
+    storePassword: System.getenv("MOONLIGHT_UPLOAD_STORE_PASSWORD"),
+    keyAlias: System.getenv("MOONLIGHT_UPLOAD_KEY_ALIAS"),
+    keyPassword: System.getenv("MOONLIGHT_UPLOAD_KEY_PASSWORD"),
+]
+def hasUploadSigning = uploadSigningValues.values().every { it != null && !it.trim().isEmpty() }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.localllmapp"
+    namespace "com.moonknightstudio.moonlightai"
     defaultConfig {
-        applicationId "com.localllmapp"
+        applicationId "com.moonknightstudio.moonlightai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        manifestPlaceholders = [usesCleartextTraffic: "false"]
     }
     signingConfigs {
         debug {
@@ -92,18 +101,42 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasUploadSigning) {
+            release {
+                storeFile file(uploadSigningValues.storeFile)
+                storePassword uploadSigningValues.storePassword
+                keyAlias uploadSigningValues.keyAlias
+                keyPassword uploadSigningValues.keyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (hasUploadSigning) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig null
+            }
+            debuggable false
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def requestsReleaseArtifact = graph.allTasks.any { task ->
+        task.path == ":app:bundleRelease" || task.path == ":app:assembleRelease"
+    }
+    if (requestsReleaseArtifact && !hasUploadSigning) {
+        throw new GradleException(
+            "Production signing is required. Set MOONLIGHT_UPLOAD_STORE_FILE, " +
+            "MOONLIGHT_UPLOAD_STORE_PASSWORD, MOONLIGHT_UPLOAD_KEY_ALIAS, and " +
+            "MOONLIGHT_UPLOAD_KEY_PASSWORD. Release artifacts are never signed with the debug key."
+        )
     }
 }
 
