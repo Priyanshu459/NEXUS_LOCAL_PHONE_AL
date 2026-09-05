@@ -12,6 +12,7 @@ export interface AppSettings {
   temperature: number;
   top_p: number;
   top_k: number;
+  maxTokens: number;
   modelUrl: string;
   memoryEnabled: boolean;
 }
@@ -21,7 +22,8 @@ export const defaultSettings: AppSettings = {
   temperature: 0.7,
   top_p: 0.9,
   top_k: 40,
-  modelUrl: 'https://huggingface.co/Qwen/Qwen1.5-1.8B-Chat-GGUF/resolve/main/qwen1_5-1_8b-chat-q4_k_m.gguf?download=true',
+  maxTokens: 512,
+  modelUrl: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
   memoryEnabled: true,
 };
 
@@ -45,13 +47,19 @@ const sanitizeSettings = (value: unknown): AppSettings => {
     return defaultSettings;
   }
 
+  const clamp = (val: unknown, min: number, max: number, fallback: number) => {
+    if (typeof val !== 'number' || isNaN(val)) return fallback;
+    return Math.max(min, Math.min(max, val));
+  };
+
   return {
     systemPrompt: typeof value.systemPrompt === 'string' && value.systemPrompt.trim()
       ? value.systemPrompt
       : defaultSettings.systemPrompt,
-    temperature: typeof value.temperature === 'number' ? value.temperature : defaultSettings.temperature,
-    top_p: typeof value.top_p === 'number' ? value.top_p : defaultSettings.top_p,
-    top_k: typeof value.top_k === 'number' ? value.top_k : defaultSettings.top_k,
+    temperature: clamp(value.temperature, 0, 2, defaultSettings.temperature),
+    top_p: clamp(value.top_p, 0, 1, defaultSettings.top_p),
+    top_k: clamp(value.top_k, 1, 100, defaultSettings.top_k),
+    maxTokens: clamp(value.maxTokens, 64, 8192, defaultSettings.maxTokens),
     modelUrl: typeof value.modelUrl === 'string' && value.modelUrl.trim()
       ? value.modelUrl
       : defaultSettings.modelUrl,
@@ -67,4 +75,69 @@ export const getSettings = (): AppSettings => {
 
 export const saveSettings = (settings: AppSettings) => {
   storage.set(SETTINGS_KEY, JSON.stringify(sanitizeSettings(settings)));
+};
+
+export interface PersistedMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export const loadChatHistory = (): PersistedMessage[] => {
+  const raw = storage.getString(CHAT_HISTORY_KEY);
+  if (!raw) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    storage.remove(CHAT_HISTORY_KEY);
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    storage.remove(CHAT_HISTORY_KEY);
+    return [];
+  }
+
+  const validMessages: PersistedMessage[] = [];
+  let neededMigration = false;
+
+  for (const item of parsed) {
+    if (isRecord(item)) {
+      if (item.role === 'system') {
+        neededMigration = true;
+        continue;
+      }
+      if (
+        typeof item.id === 'string' &&
+        (item.role === 'user' || item.role === 'assistant') &&
+        typeof item.content === 'string'
+      ) {
+        validMessages.push({
+          id: item.id,
+          role: item.role,
+          content: item.content,
+        });
+      } else {
+        neededMigration = true;
+      }
+    } else {
+      neededMigration = true;
+    }
+  }
+
+  if (neededMigration) {
+    storage.set(CHAT_HISTORY_KEY, JSON.stringify(validMessages));
+  }
+
+  return validMessages;
+};
+
+export const saveChatHistory = (messages: PersistedMessage[]) => {
+  storage.set(CHAT_HISTORY_KEY, JSON.stringify(messages));
+};
+
+export const clearChatHistory = () => {
+  storage.remove(CHAT_HISTORY_KEY);
 };

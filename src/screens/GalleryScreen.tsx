@@ -4,162 +4,127 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../components/AppHeader';
-import { GalleryCardIcon, VaultIcon } from '../components/GoogleIcons';
-import { DOCK_RESERVED_SPACE } from '../constants/layout';
+import { PageIntro, ui } from '../components/Design';
 import { Theme } from '../constants/theme';
-
-const TOOLS = [
+import { DOCK_RESERVED_SPACE } from '../constants/layout';
+const tasks = [
   {
-    id: 'chat',
-    icon: 'ai_chat',
-    title: 'Chat',
-    desc: 'Talk privately with the selected on-device model.',
+    group: 'WRITE',
+    glyph: '↗',
+    title: 'Find the right words',
+    desc: 'An email, a story, or a sharper first draft.',
+    prompt:
+      'Help me write something. First ask what I am writing, who it is for, and the tone I want.',
   },
   {
-    id: 'models',
-    icon: 'models',
-    title: 'Models',
-    desc: 'Download, inspect, and activate compatible GGUF models.',
+    group: 'UNDERSTAND',
+    glyph: '◎',
+    title: 'Make it make sense',
+    desc: 'Break a difficult idea into something clear.',
+    prompt:
+      'Help me understand a topic. Ask what I want to learn, then explain it with an everyday example and a question to check my understanding.',
   },
   {
-    id: 'settings',
-    icon: 'settings',
-    title: 'Settings',
-    desc: 'Adjust generation, memory, privacy, and storage options.',
+    group: 'BUILD',
+    glyph: '⌘',
+    title: 'Think through the code',
+    desc: 'Find a bug or explore an implementation.',
+    prompt:
+      'Help me work through a coding problem. Ask me for the code, expected behavior, and any error messages before suggesting a fix.',
   },
   {
-    id: 'voice',
-    icon: 'audio_scribe',
-    title: 'Voice Input',
-    desc: 'Open chat and dictate using your device speech service.',
+    group: 'PLAN',
+    glyph: '≡',
+    title: 'Give your idea a plan',
+    desc: 'Small, practical steps toward a bigger goal.',
+    prompt:
+      'Help me plan a project. First ask about my goal, deadline, and available resources. Then help me identify the next concrete step.',
   },
-] as const;
-
+  {
+    group: 'REFINE',
+    glyph: '✧',
+    title: 'Say it more clearly',
+    desc: 'Tighten your writing without losing your voice.',
+    prompt:
+      'Help me rewrite a piece of text for clarity while preserving my meaning. Ask me to paste the text and tell you the intended audience.',
+  },
+];
 export function GalleryScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const { width, fontScale } = useWindowDimensions();
-  const useSingleColumn = width < 380 || fontScale > 1.25;
-
-  const openTool = (id: (typeof TOOLS)[number]['id']) => {
-    if (id === 'models') navigation.navigate('Models');
-    else if (id === 'settings') navigation.navigate('Settings');
-    else navigation.navigate('Chat');
-  };
-
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={[ui.screen, { paddingTop: insets.top }]}>
       <AppHeader
-        title="Tools"
-        subtitle="Working on-device capabilities"
+        title="Explore"
         onMenuPress={() => navigation.navigate('Settings')}
       />
       <ScrollView
         contentContainerStyle={[
-          styles.content,
+          ui.content,
           { paddingBottom: insets.bottom + DOCK_RESERVED_SPACE },
         ]}
-        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.heading}>Choose what you want to do</Text>
-        <Text style={styles.intro}>
-          Every tool below opens a complete, usable workflow.
-        </Text>
-        <View style={styles.grid}>
-          {TOOLS.map(tool => (
-            <TouchableOpacity
-              key={tool.id}
-              style={[styles.card, useSingleColumn && styles.cardWide]}
-              onPress={() => openTool(tool.id)}
-              accessibilityRole="button"
-              accessibilityLabel={`${tool.title}. ${tool.desc}`}
-              activeOpacity={0.68}
-            >
-              {tool.id === 'models' ? (
-                <View style={styles.modelIcon}>
-                  <VaultIcon active />
-                </View>
-              ) : (
-                <GalleryCardIcon
-                  type={tool.icon}
-                  color={Theme.color.accent}
-                  size={42}
-                />
-              )}
-              <View style={styles.cardCopy}>
-                <Text style={styles.cardTitle}>{tool.title}</Text>
-                <Text style={styles.cardDescription}>{tool.desc}</Text>
-              </View>
-              <Text style={styles.openLabel}>
-                {tool.id === 'models'
-                  ? 'Manage models'
-                  : tool.id === 'settings'
-                  ? 'Open settings'
-                  : tool.id === 'voice'
-                  ? 'Open voice input'
-                  : 'Start chat'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <PageIntro
+          eyebrow="A PLACE TO BEGIN"
+          title={'Good ideas start\nwith a question.'}
+          body="A few thoughtful starting points. Every one opens a new conversation with your local model."
+        />
+        {tasks.map(task => (
+          <TouchableOpacity
+            key={task.group}
+            accessibilityRole="button"
+            accessibilityLabel={task.title}
+            style={S.card}
+            onPress={() =>
+              navigation.navigate('Chat', {
+                newConversation: true,
+                initialPrompt: task.prompt,
+              })
+            }
+          >
+            <View style={S.top}>
+              <Text style={S.group}>{task.group}</Text>
+              <Text style={S.glyph}>{task.glyph}</Text>
+            </View>
+            <Text style={S.title}>{task.title}</Text>
+            <Text style={ui.body}>{task.desc}</Text>
+            <Text style={S.link}>Start a conversation ↗</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Theme.color.background },
-  content: { padding: Theme.space.lg },
-  heading: {
-    color: Theme.color.text,
-    fontSize: 24,
-    fontWeight: '800',
-    marginTop: Theme.space.sm,
-  },
-  intro: {
-    color: Theme.color.textSecondary,
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 6,
-    marginBottom: Theme.space.lg,
-  },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Theme.space.md },
+const S = StyleSheet.create({
   card: {
-    flexGrow: 1,
-    flexBasis: '46%',
-    minWidth: 150,
-    minHeight: 184,
+    padding: 22,
     backgroundColor: Theme.color.surface,
-    borderRadius: Theme.radius.lg,
     borderWidth: 1,
     borderColor: Theme.color.border,
-    padding: Theme.space.lg,
+    borderRadius: 24,
+    gap: 9,
   },
-  cardWide: { flexBasis: '100%', minHeight: 154 },
-  modelIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: Theme.color.accent,
+  top: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
-  cardCopy: { flex: 1, marginTop: Theme.space.md },
-  cardTitle: { color: Theme.color.text, fontSize: 17, fontWeight: '700' },
-  cardDescription: {
-    color: Theme.color.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-    marginTop: 5,
+  group: { color: Theme.color.textMuted, fontSize: 10, letterSpacing: 2 },
+  glyph: { fontSize: 27, color: Theme.color.accent },
+  title: {
+    color: Theme.color.text,
+    fontSize: 23,
+    fontWeight: '500',
+    letterSpacing: -0.5,
   },
-  openLabel: {
+  link: {
     color: Theme.color.accent,
     fontSize: 12,
-    fontWeight: '800',
-    marginTop: Theme.space.md,
+    marginTop: 14,
+    fontWeight: '600',
   },
 });

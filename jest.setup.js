@@ -9,6 +9,7 @@ jest.mock('react-native-mmkv', () => ({
     getString: key => mockMmkvStore.get(key),
     set: (key, value) => mockMmkvStore.set(key, value),
     delete: key => mockMmkvStore.delete(key),
+    remove: key => mockMmkvStore.delete(key),
     clearAll: () => mockMmkvStore.clear(),
   }),
 }));

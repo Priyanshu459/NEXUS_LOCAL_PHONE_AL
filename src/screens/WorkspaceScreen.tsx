@@ -1,350 +1,431 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
+  Alert,
+  Modal,
   ScrollView,
-  StatusBar,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  useWindowDimensions,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GColor } from '../components/GoogleIcons';
 import { AppHeader } from '../components/AppHeader';
+import { Theme } from '../constants/theme';
+import { DOCK_RESERVED_SPACE } from '../constants/layout';
 import { getSettings } from '../services/storage';
 import {
   checkModelExists,
   getModelFilenameFromUrl,
 } from '../services/modelManager';
-import { DOCK_RESERVED_SPACE } from '../constants/layout';
+import {
+  Conversation,
+  deleteConversation,
+  listConversations,
+  renameConversation,
+} from '../services/conversations';
+import { AVAILABLE_MODELS } from '../constants/models';
 
-const PROMPT_TEMPLATES = [
+const STARTERS = [
   {
-    id: '1',
-    title: 'Summarize Document',
-    desc: 'Pull out decisions, risks, and action items from pasted text or an attached file.',
+    icon: '✦',
+    title: 'Make something',
+    detail: 'From a spark to a first draft',
     prompt:
-      'Please summarize the following content into 3 clear bullet points with key takeaways:\n\n',
+      'Help me write a first draft. Ask me about the audience, topic, and tone before you begin.',
   },
   {
-    id: '2',
-    title: 'Review Code',
-    desc: 'Find bugs, simplify structure, and suggest focused improvements.',
+    icon: '⌘',
+    title: 'Solve a problem',
+    detail: 'Code, logic, and clear next steps',
     prompt:
-      'Review this code for bugs, optimize its performance, and add clean documentation:\n\n',
+      'Help me solve a problem step by step. First ask what I am trying to do and what is getting in the way.',
   },
   {
-    id: '3',
-    title: 'Plan Architecture',
-    desc: 'Compare options, tradeoffs, and a practical path forward.',
+    icon: '◎',
+    title: 'Learn a little',
+    detail: 'Make the complicated click',
     prompt:
-      'Act as a Principal System Architect. Provide 5 architectural approaches for:\n\n',
+      'Teach me something with a simple explanation, an example, and a short quiz. First ask what I want to learn.',
   },
   {
-    id: '4',
-    title: 'Rewrite Clearly',
-    desc: 'Turn rough notes or transcripts into polished, useful prose.',
+    icon: '↗',
+    title: 'Find your focus',
+    detail: 'Turn a big goal into a small step',
     prompt:
-      'Translate and polish this transcribed text into professional business English:\n\n',
+      'Help me make a realistic plan. Ask about my goal, available time, and biggest constraint.',
   },
 ];
 
 export function WorkspaceScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
-  const [showTelemetry, setShowTelemetry] = useState(false);
-  const [modelInstalled, setModelInstalled] = useState(false);
-  const [settings, setSettings] = useState(getSettings());
-
-  useEffect(() => {
-    checkModelExists(getModelFilenameFromUrl(settings.modelUrl)).then(
-      setModelInstalled,
-    );
-  }, [settings.modelUrl]);
-
-  useEffect(
-    () => navigation.addListener('focus', () => setSettings(getSettings())),
-    [navigation],
+  const { width, fontScale } = useWindowDimensions();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [query, setQuery] = useState('');
+  const [ready, setReady] = useState(false);
+  const [modelName, setModelName] = useState('Local model');
+  const [rename, setRename] = useState<Conversation | null>(null);
+  const [title, setTitle] = useState('');
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setConversations(listConversations());
+      const settings = getSettings();
+      setModelName(
+        AVAILABLE_MODELS.find(m => m.url === settings.modelUrl)?.name ||
+          'Custom model',
+      );
+      checkModelExists(getModelFilenameFromUrl(settings.modelUrl))
+        .then(value => {
+          if (active) setReady(value);
+        })
+        .catch(() => {
+          if (active) setReady(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, []),
   );
-
-  const handleLaunchChat = (initialPrompt?: string) => {
-    navigation.navigate('Chat', initialPrompt ? { initialPrompt } : undefined);
-  };
-
+  const open = (initialPrompt?: string) =>
+    navigation.navigate('Chat', { newConversation: true, initialPrompt });
+  const matching = conversations.filter(c =>
+    `${c.title} ${c.messages.map(m => m.content).join(' ')}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+  const actions = (conversation: Conversation) =>
+    Alert.alert(conversation.title, 'Manage this conversation', [
+      {
+        text: 'Rename',
+        onPress: () => {
+          setRename(conversation);
+          setTitle(conversation.title);
+        },
+      },
+      {
+        text: 'Share text',
+        onPress: () => {
+          Share.share({
+            message: conversation.messages
+              .map(
+                m =>
+                  `${m.role === 'user' ? 'You' : 'Moonlight'}:\n${m.content}`,
+              )
+              .join('\n\n'),
+          }).catch(() => Alert.alert('Sharing unavailable'));
+        },
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert(
+            'Delete conversation?',
+            'This removes its saved messages from this phone.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete',
+                style: 'destructive',
+                onPress: () => {
+                  deleteConversation(conversation.id);
+                  setConversations(listConversations());
+                },
+              },
+            ],
+          ),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   return (
     <View style={[S.screen, { paddingTop: insets.top }]}>
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
-
       <AppHeader
-        title="Moonlight AI"
-        subtitle="Private, on-device workspace"
+        title="Moonlight"
+        subtitle="Your private thinking space"
         onMenuPress={() => navigation.navigate('Settings')}
-        trailing={
-          <TouchableOpacity
-            style={S.telemetryBtn}
-            onPress={() => setShowTelemetry(!showTelemetry)}
-            accessibilityRole="button"
-            accessibilityLabel="Open local AI status"
-            activeOpacity={0.7}
-          >
-            <View
-              style={[
-                S.dot,
-                { backgroundColor: modelInstalled ? GColor.green : '#F4C56A' },
-              ]}
-            />
-            <Text style={S.telemetryBtnText}>Status</Text>
-          </TouchableOpacity>
-        }
       />
-
-      {/* ── Developer Telemetry Overlay ───────────────────────────────────── */}
-      {showTelemetry && (
-        <View style={S.telemetryCard}>
-          <View style={S.telemetryHeader}>
-            <Text style={S.telemetryTitle}>Local Status</Text>
-            <TouchableOpacity onPress={() => setShowTelemetry(false)}>
-              <Text style={{ color: GColor.textMuted, fontSize: 20 }}>×</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={S.telemetryGrid}>
-            <View style={S.telemetryItem}>
-              <Text style={S.telemetryLabel}>Model</Text>
-              <Text style={S.telemetryVal}>
-                {modelInstalled
-                  ? 'Installed and selected'
-                  : 'Download required'}
-              </Text>
-            </View>
-            <View style={S.telemetryItem}>
-              <Text style={S.telemetryLabel}>Chat processing</Text>
-              <Text style={S.telemetryVal}>
-                {modelInstalled
-                  ? 'Runs on this device'
-                  : 'Unavailable until setup'}
-              </Text>
-            </View>
-            <View style={S.telemetryItem}>
-              <Text style={S.telemetryLabel}>Internet</Text>
-              <Text style={S.telemetryVal}>
-                {modelInstalled
-                  ? 'Not required for text chat'
-                  : 'Required to download a model'}
-              </Text>
-            </View>
-            <View style={S.telemetryItem}>
-              <Text style={S.telemetryLabel}>Selected model</Text>
-              <Text style={S.telemetryVal} numberOfLines={1}>
-                {settings.modelUrl
-                  ? settings.modelUrl.split('/').pop()
-                  : 'None'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* ── Main Tab Content ──────────────────────────────────────────────── */}
       <ScrollView
-        style={S.content}
-        contentContainerStyle={{
-          paddingBottom: insets.bottom + DOCK_RESERVED_SPACE,
-          paddingHorizontal: 16,
-        }}
-        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          S.content,
+          { paddingBottom: insets.bottom + DOCK_RESERVED_SPACE },
+        ]}
       >
-        <View style={{ gap: 20, marginTop: 16 }}>
-          {/* Hero Welcome Banner */}
-          <View style={S.heroCard}>
-            <View style={S.heroTopRow}>
-              <View style={S.heroStatusPill}>
-                <View
-                  style={[
-                    S.dot,
-                    {
-                      backgroundColor: modelInstalled
-                        ? GColor.green
-                        : '#F4C56A',
-                    },
-                  ]}
-                />
-                <Text style={S.heroStatusText}>
-                  {modelInstalled
-                    ? 'Model ready · local chat'
-                    : 'Model download needed'}
-                </Text>
-              </View>
-            </View>
-            <Text style={S.heroTitle}>How can I help today?</Text>
-            <Text style={S.heroDesc}>
-              Start a focused conversation, attach text files, or choose a
-              reusable prompt. The interface stays quiet so the work can stay
-              clear.
+        <View style={S.topline}>
+          <Text style={S.eyebrow}>YOUR THINKING SPACE</Text>
+          <Text numberOfLines={1} style={S.badge}>ON DEVICE</Text>
+        </View>
+        <Text style={S.hero}>A clear space.{'\n'}A fresh perspective.</Text>
+        <Text style={S.subtitle}>
+          Write, untangle, and explore. Your text conversations stay on your
+          phone.
+        </Text>
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={S.primary}
+          onPress={() => open()}
+        >
+          <Text style={S.primaryText}>＋ New conversation</Text>
+          <Text style={S.primaryText}>↗</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Manage local models"
+          style={S.model}
+          onPress={() => navigation.navigate('Models')}
+        >
+          <View
+            style={[S.dot, { backgroundColor: ready ? '#71C9A8' : '#D9B77C' }]}
+          />
+          <View style={S.flex}>
+            <Text style={S.modelTitle}>
+              {ready ? modelName : 'Set up your local AI'}
             </Text>
+            <Text style={S.small}>
+              {ready
+                ? 'Downloaded · ready for offline text chat'
+                : 'Download a model once to get started'}
+            </Text>
+          </View>
+          <Text style={S.muted}>›</Text>
+        </TouchableOpacity>
+        <Text style={S.section}>Where shall we start?</Text>
+        <View style={S.grid}>
+          {STARTERS.map(item => (
             <TouchableOpacity
-              style={S.launchStudioBtn}
-              onPress={() => handleLaunchChat()}
-              activeOpacity={0.85}
+              accessibilityRole="button"
+              key={item.title}
+              style={[
+                S.card,
+                (width < 380 || fontScale > 1.2) && { width: '100%' },
+              ]}
+              onPress={() => open(item.prompt)}
             >
-              <Text style={S.launchStudioBtnText}>Start Chat</Text>
+              <Text style={S.cardIcon}>{item.icon}</Text>
+              <Text style={S.cardTitle}>{item.title}</Text>
+              <Text style={S.small}>{item.detail}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={S.topline}>
+          <Text style={S.section}>Your conversations</Text>
+          <Text style={S.muted}>{conversations.length}</Text>
+        </View>
+        <TextInput
+          accessibilityLabel="Search conversations"
+          placeholder="Search your ideas…"
+          placeholderTextColor={Theme.color.textMuted}
+          value={query}
+          onChangeText={setQuery}
+          style={S.search}
+        />
+        {matching.map(c => (
+          <View key={c.id} style={S.conversation}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              style={S.flex}
+              onPress={() =>
+                navigation.navigate('Chat', { conversationId: c.id })
+              }
+            >
+              <Text numberOfLines={1} style={S.cardTitle}>
+                {c.title}
+              </Text>
+              <Text numberOfLines={1} style={S.small}>
+                {c.messages[c.messages.length - 1]?.content ||
+                  'No messages yet'}
+              </Text>
+              <Text style={S.date}>
+                {c.messages.length} messages ·{' '}
+                {new Date(c.updatedAt).toLocaleDateString()}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={`Manage ${c.title}`}
+              style={S.more}
+              onPress={() => actions(c)}
+            >
+              <Text style={S.muted}>•••</Text>
             </TouchableOpacity>
           </View>
-
-          {/* M3 Assist Chips / Prompt Starters */}
-          <View>
-            <Text style={S.sectionLabel}>Suggested Tasks</Text>
-            <View style={{ gap: 10, marginTop: 10 }}>
-              {PROMPT_TEMPLATES.map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[S.templateCard]}
-                  onPress={() => {
-                    handleLaunchChat(item.prompt);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.title}. ${item.desc}`}
-                  activeOpacity={0.8}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <Text style={S.templateTitle}>{item.title}</Text>
-                    <View style={S.arrowPill}>
-                      <Text
-                        style={{
-                          color: GColor.blue,
-                          fontSize: 12,
-                          fontWeight: '700',
-                        }}
-                      >
-                        {item.id === '1'
-                          ? 'Summarize'
-                          : item.id === '2'
-                          ? 'Review code'
-                          : item.id === '3'
-                          ? 'Start planning'
-                          : 'Rewrite'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={S.templateDesc}>{item.desc}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        ))}
+        {!matching.length && (
+          <View style={S.empty}>
+            <Text style={S.cardTitle}>
+              {query
+                ? 'No matching conversations'
+                : 'Your next idea starts here'}
+            </Text>
+            <Text style={S.small}>
+              {query
+                ? 'Try a different word or phrase.'
+                : 'Start a chat. Come back to it whenever you like.'}
+            </Text>
+          </View>
+        )}
+        <Text style={S.footnote}>
+          Offline by design. Answers can be mistaken; check important details.
+        </Text>
+      </ScrollView>
+      <Modal
+        transparent
+        visible={!!rename}
+        animationType="fade"
+        onRequestClose={() => setRename(null)}
+      >
+        <View style={S.overlay}>
+          <View style={S.dialog}>
+            <Text style={S.section}>Rename conversation</Text>
+            <TextInput
+              accessibilityLabel="Conversation title"
+              autoFocus
+              value={title}
+              onChangeText={setTitle}
+              maxLength={100}
+              style={S.search}
+            />
+            <TouchableOpacity
+              style={S.primary}
+              onPress={() => {
+                if (rename && title.trim()) {
+                  renameConversation(rename.id, title);
+                  setConversations(listConversations());
+                  setRename(null);
+                }
+              }}
+            >
+              <Text style={S.primaryText}>Save title</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={S.more} onPress={() => setRename(null)}>
+              <Text style={S.muted}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
+      </Modal>
     </View>
   );
 }
-
 const S = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: GColor.bg },
-  telemetryBtn: {
+  screen: { flex: 1, backgroundColor: Theme.color.background },
+  flex: { flex: 1 },
+  content: { padding: 22, gap: 18 },
+  topline: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: GColor.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: GColor.border,
-  },
-  telemetryBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: GColor.textPrimary,
-  },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  telemetryCard: {
-    margin: 16,
-    padding: 14,
-    backgroundColor: GColor.surfaceHigh,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: GColor.green + '40',
-    gap: 10,
-  },
-  telemetryHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  telemetryTitle: {
-    fontSize: 13,
+  eyebrow: {
+    color: '#929AA6',
+    fontSize: 10,
+    letterSpacing: 2,
     fontWeight: '700',
-    color: GColor.textPrimary,
   },
-  telemetryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  telemetryItem: { width: '46%', gap: 2 },
-  telemetryLabel: { fontSize: 11, color: GColor.textSecondary },
-  telemetryVal: { fontSize: 12, fontWeight: '600', color: GColor.textPrimary },
-  content: { flex: 1 },
-  heroCard: {
-    backgroundColor: GColor.surfaceHigh,
-    padding: 22,
+  badge: {
+    color: '#A8C7FA',
+    fontSize: 9,
+    letterSpacing: 1.2,
+    backgroundColor: '#252F3F',
+    padding: 7,
+    borderRadius: 6,
+  },
+  hero: {
+    color: '#F3F4F6',
+    fontSize: 40,
+    lineHeight: 46,
+    fontWeight: '500',
+    letterSpacing: -1.8,
+    marginTop: 12,
+  },
+  subtitle: { color: '#B5BAC3', fontSize: 16, lineHeight: 25, maxWidth: 330 },
+  primary: {
+    minHeight: 54,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: Theme.color.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  primaryText: { color: '#141517', fontSize: 15, fontWeight: '700' },
+  model: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#1D1F22',
+    borderRadius: 14,
+  },
+  dot: { width: 7, height: 7, borderRadius: 4 },
+  modelTitle: { color: '#F3F4F6', fontWeight: '600', marginBottom: 4 },
+  small: { color: '#B5BAC3', fontSize: 12, lineHeight: 19 },
+  muted: { color: '#B5BAC3', fontSize: 14 },
+  section: { fontSize: 18, fontWeight: '600', color: '#F3F4F6', marginTop: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  card: {
+    width: '47%',
+    flexGrow: 1,
+    padding: 16,
+    minHeight: 146,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: GColor.border,
-    gap: 12,
+    borderColor: '#33363C',
+    backgroundColor: '#1D1F22',
+    gap: 8,
   },
-  heroTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  heroStatusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: GColor.surfaceHigh,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  heroStatusText: {
-    fontSize: 11,
+  cardIcon: { color: '#A8C7FA', fontSize: 25, marginBottom: 7 },
+  cardTitle: {
+    color: '#F3F4F6',
     fontWeight: '600',
-    color: GColor.textSecondary,
+    fontSize: 15,
+    marginBottom: 4,
   },
-  heroTitle: { fontSize: 28, fontWeight: '800', color: GColor.textPrimary },
-  heroDesc: { fontSize: 14, color: GColor.textSecondary, lineHeight: 21 },
-  launchStudioBtn: {
-    backgroundColor: GColor.textPrimary,
-    paddingVertical: 13,
-    borderRadius: 14,
+  search: {
+    backgroundColor: '#1D1F22',
+    borderWidth: 1,
+    borderColor: '#33363C',
+    borderRadius: 12,
+    color: '#F3F4F6',
+    padding: 14,
+    minHeight: 50,
+  },
+  conversation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#33363C',
+  },
+  date: { color: '#929AA6', fontSize: 11, marginTop: 8 },
+  more: {
+    minHeight: 48,
+    minWidth: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
   },
-  launchStudioBtnText: { fontSize: 14, fontWeight: '800', color: GColor.bg },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: GColor.textSecondary,
-    letterSpacing: 0,
+  empty: { paddingVertical: 24, gap: 6 },
+  footnote: {
+    color: '#929AA6',
+    fontSize: 11,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: 12,
   },
-  templateCard: {
-    backgroundColor: GColor.surface,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: GColor.border,
-    gap: 6,
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: '#000A',
+    padding: 24,
   },
-  templateTitle: { fontSize: 15, fontWeight: '700', color: GColor.textPrimary },
-  templateDesc: { fontSize: 12, color: GColor.textSecondary, lineHeight: 18 },
-  arrowPill: {
-    backgroundColor: GColor.blue + '18',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 10,
+  dialog: {
+    backgroundColor: '#1D1F22',
+    padding: 20,
+    borderRadius: 20,
+    gap: 16,
   },
 });
+

@@ -1,9 +1,9 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNavigationItem } from './BottomNavigationItem';
-import { StudioIcon, ToolsIcon, VaultIcon } from './GoogleIcons';
+
 import { DOCK_HEIGHT } from '../constants/layout';
 import { Theme } from '../constants/theme';
 
@@ -41,19 +41,21 @@ export function MoonDock({
             }
           };
 
-          const icon =
-            route.name === 'Home' ? (
-              <StudioIcon active={selected} />
-            ) : route.name === 'Tools' ? (
-              <ToolsIcon active={selected} />
-            ) : (
-              <VaultIcon active={selected} />
-            );
+          const icon = (
+            <Text
+              style={{
+                color: selected ? Theme.color.accent : Theme.color.textMuted,
+                fontSize: 22,
+              }}
+            >
+              {route.name === 'Home' ? '◒' : route.name === 'Tools' ? '✧' : '▤'}
+            </Text>
+          );
 
           return (
             <BottomNavigationItem
               key={route.key}
-              label={label}
+              label={route.name === 'Tools' ? 'Explore' : label}
               selected={selected}
               icon={icon}
               onPress={onPress}

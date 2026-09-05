@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../components/AppHeader';
 import { AVAILABLE_MODELS } from '../constants/models';
 import { DOCK_RESERVED_SPACE } from '../constants/layout';
+import { PageIntro } from '../components/Design';
 import { Theme } from '../constants/theme';
 import { getSettings, saveSettings } from '../services/storage';
 import {
@@ -30,26 +31,33 @@ export function ModelsScreen({ navigation }: any) {
   const [checking, setChecking] = useState(true);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [loadError, setLoadError] = useState(false);
 
   const refreshInstallations = useCallback(async () => {
     setChecking(true);
-    const savedSettings = getSettings();
-    const urls = AVAILABLE_MODELS.map(model => model.url);
-    if (!urls.includes(savedSettings.modelUrl)) {
-      urls.push(savedSettings.modelUrl);
+    setLoadError(false);
+    try {
+      const savedSettings = getSettings();
+      const urls = AVAILABLE_MODELS.map(model => model.url);
+      if (!urls.includes(savedSettings.modelUrl)) {
+        urls.push(savedSettings.modelUrl);
+      }
+      const entries = await Promise.all(
+        urls.map(
+          async url =>
+            [
+              url,
+              await checkModelExists(getModelFilenameFromUrl(url)),
+            ] as const,
+        ),
+      );
+      setInstalled(Object.fromEntries(entries));
+      setSettings(savedSettings);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setChecking(false);
     }
-    const entries = await Promise.all(
-      urls.map(
-        async url =>
-          [
-            url,
-            await checkModelExists(getModelFilenameFromUrl(url)),
-          ] as const,
-      ),
-    );
-    setInstalled(Object.fromEntries(entries));
-    setSettings(savedSettings);
-    setChecking(false);
   }, []);
 
   useEffect(() => {
@@ -139,8 +147,8 @@ export function ModelsScreen({ navigation }: any) {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <AppHeader
-        title="Model Store"
-        subtitle="Downloads need internet. Compatible GGUF models run chat on this device."
+        title="Your models"
+        subtitle="A little intelligence, kept close"
         onMenuPress={() => navigation.navigate('Settings')}
       />
       <ScrollView
@@ -150,14 +158,23 @@ export function ModelsScreen({ navigation }: any) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.notice} accessibilityRole="summary">
-          <Text style={styles.noticeTitle}>Transparent local setup</Text>
-          <Text style={styles.noticeText}>
-            Choose a quantized GGUF model that fits your device storage and
-            memory. Actual memory use depends on the model and context length.
-          </Text>
-        </View>
-
+        <PageIntro
+          eyebrow="INTELLIGENCE, ON DEVICE"
+          title="Find your thinking partner."
+          body="Download once. Keep it close. Choose a model that fits your phone and the way you like to work."
+        />
+        {loadError && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={styles.notice}
+            onPress={refreshInstallations}
+          >
+            <Text style={styles.noticeTitle}>
+              Could not check downloaded models
+            </Text>
+            <Text style={styles.noticeText}>Tap to try again.</Text>
+          </TouchableOpacity>
+        )}
         {AVAILABLE_MODELS.map(model => {
           const isActive = settings.modelUrl === model.url;
           const isInstalled = !!installed[model.url];
@@ -243,7 +260,11 @@ export function ModelsScreen({ navigation }: any) {
                     onPress={() =>
                       isDownloading ? stopDownload() : startDownload(model.url)
                     }
-                    disabled={checking || (!!downloadingUrl && !isDownloading)}
+                    disabled={
+                      checking ||
+                      loadError ||
+                      (!!downloadingUrl && !isDownloading)
+                    }
                     accessibilityRole="button"
                   >
                     <Text style={styles.primaryButtonText}>
@@ -285,7 +306,12 @@ export function ModelsScreen({ navigation }: any) {
         })}
 
         {customModelUrl ? (
-          <View style={[styles.card, installed[customModelUrl] && styles.activeCard]}>
+          <View
+            style={[
+              styles.card,
+              installed[customModelUrl] && styles.activeCard,
+            ]}
+          >
             <View style={styles.cardTopRow}>
               <View style={styles.providerPill}>
                 <Text style={styles.providerText}>Hugging Face</Text>
@@ -307,7 +333,10 @@ export function ModelsScreen({ navigation }: any) {
             {downloadingUrl === customModelUrl ? (
               <View style={styles.progressTrack}>
                 <View
-                  style={[styles.progressFill, { width: `${downloadProgress}%` }]}
+                  style={[
+                    styles.progressFill,
+                    { width: `${downloadProgress}%` },
+                  ]}
                 />
               </View>
             ) : null}
@@ -375,7 +404,7 @@ const styles = StyleSheet.create({
     borderColor: Theme.color.border,
     padding: Theme.space.lg,
   },
-  activeCard: { borderColor: Theme.color.accent, backgroundColor: '#1D2030' },
+  activeCard: { borderColor: Theme.color.accent, backgroundColor: '#202730' },
   cardTopRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -451,13 +480,17 @@ const styles = StyleSheet.create({
   primaryButton: {
     minHeight: Theme.touchTarget,
     flexGrow: 1,
-    backgroundColor: Theme.color.accent,
+    backgroundColor: Theme.color.primary,
     borderRadius: Theme.radius.md,
     paddingHorizontal: Theme.space.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  primaryButtonText: {
+    color: Theme.color.background,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   disabledButton: { opacity: 0.45 },
   secondaryButton: {
     minHeight: Theme.touchTarget,

@@ -1,75 +1,55 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MoonlightBrandIcon, { MOONLIGHT_BRAND_SIZE } from './MoonlightBrandIcon';
-import { MenuIcon } from './GoogleIcons';
+import { StyleSheet, Text, View } from 'react-native';
 import { Theme } from '../constants/theme';
-
-type AppHeaderProps = {
+import { IconButton, MoonMark } from './Design';
+type Props = {
   title: string;
   subtitle?: string;
   onMenuPress?: () => void;
   trailing?: React.ReactNode;
   showBrand?: boolean;
 };
-
 export function AppHeader({
   title,
   subtitle,
   onMenuPress,
   trailing,
   showBrand = true,
-}: AppHeaderProps) {
+}: Props) {
   return (
-    <View style={styles.header}>
-      {onMenuPress ? (
-        <TouchableOpacity
-          style={styles.menuButton}
-          onPress={onMenuPress}
-          accessibilityRole="button"
-          accessibilityLabel="Open settings"
-          activeOpacity={0.7}
-        >
-          <MenuIcon size={21} color={Theme.color.text} />
-        </TouchableOpacity>
-      ) : null}
-      {showBrand ? (
-        <MoonlightBrandIcon size={MOONLIGHT_BRAND_SIZE.header} />
-      ) : null}
-      <View style={styles.copy}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    <View style={S.header}>
+      {showBrand && <MoonMark size={30} />}
+      <View style={S.copy}>
+        <Text style={S.title}>{title}</Text>
+        {!!subtitle && <Text style={S.subtitle}>{subtitle}</Text>}
       </View>
-      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+      {trailing}
+      {onMenuPress && (
+        <IconButton glyph="☷" label="Open settings" onPress={onMenuPress} />
+      )}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
+const S = StyleSheet.create({
   header: {
-    minHeight: 68,
-    paddingHorizontal: Theme.space.lg,
-    paddingVertical: Theme.space.sm,
+    minHeight: 72,
+    paddingHorizontal: 22,
+    paddingVertical: 8,
     flexDirection: 'row',
+    gap: 12,
     alignItems: 'center',
-    gap: Theme.space.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Theme.color.border,
   },
-  menuButton: {
-    width: Theme.touchTarget,
-    height: Theme.touchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Theme.radius.md,
+  copy: { flex: 1 },
+  title: {
+    color: Theme.color.text,
+    fontSize: 20,
+    letterSpacing: -0.5,
+    fontWeight: '600',
   },
-  copy: { flex: 1, minWidth: 0 },
-  title: { color: Theme.color.text, fontSize: 20, fontWeight: '800' },
   subtitle: {
-    color: Theme.color.textSecondary,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 2,
-    flexShrink: 1,
+    color: Theme.color.textMuted,
+    fontSize: 11,
+    marginTop: 3,
+    lineHeight: 16,
   },
-  trailing: { flexShrink: 0 },
 });

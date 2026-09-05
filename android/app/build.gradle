@@ -90,8 +90,12 @@ android {
         applicationId "com.moonknightstudio.moonlightai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.1.0"
+        if (project.hasProperty('moonlightPreview')) {
+            applicationIdSuffix ".preview"
+            versionNameSuffix "-preview"
+        }
         manifestPlaceholders = [usesCleartextTraffic: "false"]
     }
     signingConfigs {

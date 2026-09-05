@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Alert,
   Linking,
@@ -22,6 +23,7 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'PrivacyPolicy'>;
 
 export function PrivacyPolicyScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
   const published = hasPublishedPrivacyPolicy();
   const openLink = async (url: string) => {
     try {
@@ -44,7 +46,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
     }
   };
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity
           accessibilityRole="button"
@@ -150,7 +152,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0F1014' },
+  screen: { flex: 1, backgroundColor: '#141517' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -160,27 +162,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.10)',
   },
-  back: { color: '#6EA8FE', fontSize: 15, fontWeight: '700' },
-  title: { color: '#F4F4F5', fontSize: 18, fontWeight: '800' },
+  back: { color: '#A8C7FA', fontSize: 15, fontWeight: '700' },
+  title: { color: '#F3F4F6', fontSize: 18, fontWeight: '800' },
   headerSpacer: { width: 36 },
   content: { padding: 20, paddingBottom: 48 },
-  updated: { color: '#777D89', marginBottom: 16 },
+  updated: { color: '#929AA6', marginBottom: 16 },
   heading: {
-    color: '#F4F4F5',
+    color: '#F3F4F6',
     fontSize: 16,
     fontWeight: '800',
     marginTop: 18,
     marginBottom: 6,
   },
-  body: { color: '#B5BAC4', fontSize: 14, lineHeight: 21 },
+  body: { color: '#B5BAC3', fontSize: 14, lineHeight: 21 },
   linkButton: {
     marginTop: 24,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: '#1B355C',
+    backgroundColor: '#252F3F',
     alignItems: 'center',
   },
   textLink: { marginTop: 14, alignSelf: 'flex-start' },
-  linkText: { color: '#6EA8FE', fontWeight: '800' },
+  linkText: { color: '#A8C7FA', fontWeight: '800' },
   pending: { marginTop: 24, color: '#FFB86B', fontSize: 13, lineHeight: 19 },
 });

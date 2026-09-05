@@ -1,97 +1,45 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Moonlight AI
 
-# Getting Started
+The latest app, with neutral colors and restored branding, is available as `releases/Moonlight-Updated-arm64.apk`. See [UI redesign notes](UI_REDESIGN.md) for changes and verification.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+A private, on-device text assistant built with React Native and llama.rn.
 
-## Step 1: Start Metro
+## 1.1.0 preview
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+The update adds a refreshed home, searchable saved conversations, rename/share/delete controls, formatted answers, and automatic context fitting for longer chats. See [the app assessment](APP_STATE.md) for findings and limitations.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## Test on your phone
 
-```sh
-# Using npm
-npm start
+1. Copy `releases/Moonlight-1.1.0-preview-arm64.apk` to a 64-bit ARM Android phone running Android 7.0 or later.
+2. Open it from Files and allow installation from that app if Android asks.
+3. Launch Moonlight AI. The preview installs separately from the old app and has separate chats/models.
+4. Download a model on Wi-Fi. The default Qwen 2.5 1.5B download is approximately 1.1 GB; leave additional storage and RAM available. Models are not bundled in the APK.
+5. Start a chat, go home, reopen it, and test search, rename, sharing, and deletion.
+6. After the model is downloaded, try text chat in airplane mode. Test Stop, a longer conversation, a short text attachment, and the memory toggle.
 
-# OR using Yarn
-yarn start
-```
+This is a signed release-mode preview, not a Play Store publication. Device performance has not been measured. It supports ARM64 phones only.
 
-## Step 2: Build and run your app
+## Development
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+```powershell
+npm ci
+npx tsc --noEmit
+npm test -- --runInBand
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+## Rebuild the signed preview
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+With Android Studio, SDK 36, NDK 27.1.12297006, and Node installed:
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/build-preview.ps1
 ```
 
-Then, and every time you update your native dependencies, run:
+The script uses the local Android SDK, generates a preview signing key if needed, builds the bundled release, verifies its signature, and copies it to `releases`. Keep the ignored `.local-release` directory private and backed up if you want future preview APKs to update this installation. It contains the local signing key and its credentials. Public-release signing requirements remain in `play-store/signing.md`.
 
-```sh
-bundle exec pod install
-```
+Preview application ID: `com.moonknightstudio.moonlightai.preview`.
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+For a JavaScript-only rebuild after a successful native release, `tools/build-preview.ps1 -ReuseNativeBinaries` reuses compiled native libraries. This avoids an incremental Ninja 260-character path error observed in this Windows checkout. Do not use that option after changing native code, Android configuration, or dependencies; those require a full native rebuild, preferably from a shorter workspace/cache path.
 
-```sh
-# Using npm
-npm run ios
 
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.

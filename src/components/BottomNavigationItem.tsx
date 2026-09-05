@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     backgroundColor: Theme.color.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(124, 140, 255, 0.32)',
+    borderColor: '#424C5D',
   },
   icon: {
     width: 24,

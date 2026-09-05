@@ -1,4 +1,5 @@
 import RNFS from 'react-native-fs';
+import { AVAILABLE_MODELS } from '../constants/models';
 
 const FALLBACK_MODEL_FILENAME = 'model.gguf';
 
@@ -320,6 +321,17 @@ export const deleteModel = async (filename: string) => {
   }
 };
 
+
+const safeCleanup = async (path: string) => {
+  try {
+    if (await RNFS.exists(path)) {
+      await RNFS.unlink(path);
+    }
+  } catch (cleanupErr) {
+    console.warn('Failed to cleanup temp file:', cleanupErr);
+  }
+};
+
 let currentJobId: number | null = null;
 
 export const cancelDownload = () => {
@@ -334,6 +346,18 @@ export const downloadModel = async (
   filename: string,
   onProgress: (progress: number) => void,
 ): Promise<string> => {
+  const catalogModel = AVAILABLE_MODELS.find(m => m.url === url);
+  const expectedSizeBytes = catalogModel?.expectedSizeBytes;
+  const expectedSha256 = catalogModel?.sha256;
+
+  if (expectedSizeBytes) {
+    const fsInfo = await RNFS.getFSInfo();
+    const requiredSpace = expectedSizeBytes + 100 * 1024 * 1024; // 100MB safety margin
+    if (fsInfo.freeSpace < requiredSpace) {
+      throw new Error(`Insufficient storage. This model requires at least ${(requiredSpace / 1024 / 1024 / 1024).toFixed(2)} GB of free space.`);
+    }
+  }
+
   const resolvedDownload = await resolveHuggingFaceModelUrl(url);
   const effectiveUrl = resolvedDownload.url;
 
@@ -348,9 +372,7 @@ export const downloadModel = async (
   }
 
   // Ensure any previous interrupted download is removed
-  if (await RNFS.exists(tmpPath)) {
-    await RNFS.unlink(tmpPath);
-  }
+  await safeCleanup(tmpPath);
 
   return new Promise((resolve, reject) => {
     const job = RNFS.downloadFile({
@@ -374,14 +396,28 @@ export const downloadModel = async (
       .then(async res => {
         currentJobId = null;
         if (res.statusCode === 200) {
-          // Move tmp file to final destination
+          if (expectedSizeBytes) {
+            const stat = await RNFS.stat(tmpPath);
+            if (stat.size !== expectedSizeBytes) {
+              await safeCleanup(tmpPath);
+              throw new Error(`Model integrity check failed: Expected ${expectedSizeBytes} bytes, but downloaded ${stat.size} bytes.`);
+            }
+          }
+
+          if (expectedSha256) {
+            const actualSha256 = await RNFS.hash(tmpPath, 'sha256');
+            if (actualSha256.toLowerCase() !== expectedSha256.toLowerCase()) {
+              await safeCleanup(tmpPath);
+              throw new Error('Model integrity check failed: SHA256 checksum mismatch.');
+            }
+          }
+
+          // Move tmp file to final destination atomically
           await RNFS.moveFile(tmpPath, path);
           onProgress(100);
           resolve(path);
         } else if (res.statusCode === 401 || res.statusCode === 403) {
-          if (await RNFS.exists(tmpPath)) {
-            await RNFS.unlink(tmpPath);
-          }
+          await safeCleanup(tmpPath);
           reject(
             new Error(
               `This model requires Hugging Face access. ` +
@@ -389,9 +425,7 @@ export const downloadModel = async (
             ),
           );
         } else if (res.statusCode === 404) {
-          if (await RNFS.exists(tmpPath)) {
-            await RNFS.unlink(tmpPath);
-          }
+          await safeCleanup(tmpPath);
           reject(
             new Error(
               `The requested model file does not exist. ` +
@@ -399,14 +433,13 @@ export const downloadModel = async (
             ),
           );
         } else {
-          if (await RNFS.exists(tmpPath)) {
-            await RNFS.unlink(tmpPath);
-          }
+          await safeCleanup(tmpPath);
           reject(new Error(`Download interrupted. Try again. (HTTP ${res.statusCode})`));
         }
       })
-      .catch(err => {
+      .catch(async err => {
         currentJobId = null;
+        await safeCleanup(tmpPath);
         reject(err);
       });
   });
