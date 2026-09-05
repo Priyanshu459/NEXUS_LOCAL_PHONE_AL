@@ -94,3 +94,19 @@ test('dictation stays in the composer for review and send is disabled without a 
   ).toBe(true);
   await act(async () => view.unmount());
 });
+
+test('stopping generation safely handles non-promise stopCompletion without throwing', async () => {
+  let view!: Renderer.ReactTestRenderer;
+  await act(async () => {
+    view = Renderer.create(
+      <ChatScreen
+        navigation={navigation as any}
+        route={{ params: {} } as any}
+      />,
+    );
+  });
+
+  // Verify unmounting safely stops completion without throwing
+  await expect(act(async () => view.unmount())).resolves.not.toThrow();
+});
+

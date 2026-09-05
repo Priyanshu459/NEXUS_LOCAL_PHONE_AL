@@ -383,10 +383,18 @@ export function ChatScreen({ navigation, route }: Props) {
       const context = llamaRef.current;
       llamaRef.current = null;
       if (context) {
-        context
-          .stopCompletion()
-          .catch(() => {})
-          .finally(() => context.release().catch(() => {}));
+        try {
+          const stopRes = context.stopCompletion() as unknown;
+          if (stopRes && typeof (stopRes as any).catch === 'function') {
+            (stopRes as Promise<any>).catch(() => {});
+          }
+        } catch {}
+        try {
+          const releaseRes = context.release() as unknown;
+          if (releaseRes && typeof (releaseRes as any).catch === 'function') {
+            (releaseRes as Promise<any>).catch(() => {});
+          }
+        } catch {}
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -537,6 +545,7 @@ export function ChatScreen({ navigation, route }: Props) {
     setAttachedFile(null);
     setIsGenerating(true);
 
+    let fullResponse = '';
     try {
       const formattedResult = await fitContext(
         context,
@@ -562,7 +571,6 @@ export function ChatScreen({ navigation, route }: Props) {
           : '',
       );
 
-      let fullResponse = '';
       await context.completion(
         {
           prompt: formattedResult.prompt,
@@ -592,8 +600,10 @@ export function ChatScreen({ navigation, route }: Props) {
         },
       );
 
-      const newMemories = parseMemoryActions(fullResponse);
-      if (settings.memoryEnabled) newMemories.forEach(m => addMemory(m));
+      if (!cancelRequested.current && settings.memoryEnabled) {
+        const newMemories = parseMemoryActions(fullResponse);
+        newMemories.forEach(m => addMemory(m));
+      }
       const savedResponse = fullResponse
         .replace(/<MEMORY>[\s\S]*?(?:<\/MEMORY>|$)/gi, '')
         .trim();
@@ -606,24 +616,48 @@ export function ChatScreen({ navigation, route }: Props) {
       saveConversation(conversationId.current, completedMessages);
       if (mounted.current) setMessages(completedMessages);
     } catch (e: any) {
-      console.error(e);
-      Alert.alert(
-        'Generation Error',
-        e?.message || 'Failed to generate response.',
-      );
-      setMessages(messages);
-      setInputText(rawInput);
-      setAttachedFile(attachedFile);
+      if (cancelRequested.current) {
+        // User requested stop: preserve whatever response was already received, or remove empty assistant placeholder
+        const savedResponse = fullResponse
+          .replace(/<MEMORY>[\s\S]*?(?:<\/MEMORY>|$)/gi, '')
+          .trim();
+        const completedMessages: Message[] = savedResponse
+          ? [
+              ...newMessages,
+              { id: aid, role: 'assistant', content: savedResponse },
+            ]
+          : newMessages;
+        saveConversation(conversationId.current, completedMessages);
+        if (mounted.current) setMessages(completedMessages);
+      } else {
+        console.error(e);
+        Alert.alert(
+          'Generation Error',
+          e?.message || 'Failed to generate response.',
+        );
+        setMessages(messages);
+        setInputText(rawInput);
+        setAttachedFile(attachedFile);
+      }
     } finally {
       generationBusy.current = false;
-      setIsGenerating(false);
+      if (mounted.current) {
+        setIsGenerating(false);
+      }
     }
   };
 
   const stopGeneration = () => {
     if (llamaRef.current && isGenerating) {
       cancelRequested.current = true;
-      llamaRef.current.stopCompletion().catch(() => {});
+      try {
+        const stopRes = llamaRef.current.stopCompletion() as unknown;
+        if (stopRes && typeof (stopRes as any).catch === 'function') {
+          (stopRes as Promise<any>).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('stopCompletion failed:', err);
+      }
     }
   };
 
