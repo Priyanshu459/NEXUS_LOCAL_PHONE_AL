@@ -4,7 +4,6 @@ import {
   Modal,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -14,7 +13,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../components/AppHeader';
-import { Theme } from '../constants/theme';
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import { DOCK_RESERVED_SPACE } from '../constants/layout';
 import { getSettings } from '../services/storage';
 import {
@@ -61,6 +60,7 @@ const STARTERS = [
 ];
 
 export function WorkspaceScreen({ navigation }: any) {
+  useAppearance();
   const insets = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -310,7 +310,7 @@ export function WorkspaceScreen({ navigation }: any) {
     </View>
   );
 }
-const S = StyleSheet.create({
+const S = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: Theme.color.background },
   flex: { flex: 1 },
   content: { padding: 22, gap: 18 },
@@ -427,5 +427,4 @@ const S = StyleSheet.create({
     borderRadius: 20,
     gap: 16,
   },
-});
-
+}));

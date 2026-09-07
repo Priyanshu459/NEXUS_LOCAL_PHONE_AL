@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Theme } from '../constants/theme';
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import MoonlightBrandIcon from './MoonlightBrandIcon';
 const c = Theme.color;
 // Use the same artwork as the site assets and Android launcher, without tinting.
@@ -12,12 +12,15 @@ export function IconButton({
   label,
   onPress,
   disabled = false,
+  icon,
 }: {
   glyph: string;
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  icon?: 'microphone';
 }) {
+  useAppearance();
   return (
     <TouchableOpacity
       accessibilityRole="button"
@@ -26,7 +29,11 @@ export function IconButton({
       onPress={onPress}
       style={[ui.iconButton, disabled && ui.disabled]}
     >
-      <Text style={ui.glyph}>{glyph}</Text>
+      {icon === 'microphone' || label === 'Dictate message' ? <View style={{width:24,height:28,alignItems:'center'}}>
+        <View style={{width:10,height:18,borderWidth:1.7,borderColor:c.text,borderRadius:5}}/>
+        <View style={{position:'absolute',top:8,width:19,height:15,borderWidth:1.7,borderTopWidth:0,borderColor:c.text,borderBottomLeftRadius:10,borderBottomRightRadius:10}}/>
+        <View style={{width:1.7,height:6,backgroundColor:c.text,marginTop:4}}/>
+      </View> : <Text style={ui.glyph}>{glyph}</Text>}
     </TouchableOpacity>
   );
 }
@@ -47,7 +54,7 @@ export function PageIntro({
     </View>
   );
 }
-export const ui = StyleSheet.create({
+export const ui = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: c.background },
   content: { padding: 22, gap: 18 },
   intro: { gap: 12, marginTop: 14, marginBottom: 12 },
@@ -59,7 +66,8 @@ export const ui = StyleSheet.create({
   },
   title: {
     color: c.text,
-    fontSize: 36,
+    fontFamily: Theme.headingFont,
+    fontSize: 34,
     fontWeight: '600',
     lineHeight: 43,
     letterSpacing: -1.4,
@@ -67,7 +75,7 @@ export const ui = StyleSheet.create({
   body: { color: c.textSecondary, fontSize: 14, lineHeight: 22 },
   card: {
     backgroundColor: c.surface,
-    borderRadius: 22,
+    borderRadius: 16,
     padding: 20,
     gap: 12,
     borderWidth: 1,
@@ -105,4 +113,4 @@ export const ui = StyleSheet.create({
     backgroundColor: c.background,
   },
   small: { color: c.textMuted, fontSize: 12, lineHeight: 19 },
-});
+}));

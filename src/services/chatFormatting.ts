@@ -1,6 +1,7 @@
 import type { LlamaContext } from 'llama.rn';
-import { AVAILABLE_MODELS } from '../constants/models';
+import { MODEL_CATALOG } from '../constants/models';
 import { PersistedMessage } from './storage';
+import {sourceEvidence, WebSource} from './webSearch';
 
 export interface ChatFormattingOptions {
   messages: PersistedMessage[];
@@ -8,6 +9,7 @@ export interface ChatFormattingOptions {
   memoryContextString: string;
   currentAttachmentText?: string;
   modelUrl: string;
+  webSources?: WebSource[];
 }
 
 export interface ChatFormattingResult {
@@ -22,12 +24,13 @@ export async function formatMessagesForModel(
 ): Promise<ChatFormattingResult> {
   const { messages, systemPrompt, memoryContextString, currentAttachmentText, modelUrl } = options;
 
-  const catalogModel = AVAILABLE_MODELS.find(m => m.url === modelUrl);
+  const catalogModel = MODEL_CATALOG.find(m => m.url === modelUrl);
   const isDeepSeek = catalogModel?.id.includes('deepseek');
   const isGemma = catalogModel?.id.includes('gemma'); // Gemma rejects system role
 
   // Construct context string
   let contextStr = systemPrompt;
+  if (options.webSources?.length) contextStr += sourceEvidence(options.webSources);
   if (memoryContextString) {
     contextStr += `\n\n<MEMORY>\n${memoryContextString}\n</MEMORY>`;
   }

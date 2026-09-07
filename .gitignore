@@ -74,6 +74,7 @@ yarn-error.log
 /coverage
 /.local-release/
 /releases/
+/output/
 
 # Yarn
 .yarn/*

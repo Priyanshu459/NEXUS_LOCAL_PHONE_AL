@@ -8,6 +8,8 @@ $keystorePath = Join-Path $signingDir 'moonlight-preview.jks'
 $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 $env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android\Sdk'
 $env:GRADLE_USER_HOME = Join-Path $projectRoot '.gradle-user'
+$env:ANDROID_USER_HOME = Join-Path $signingDir 'android-user'
+New-Item -ItemType Directory -Force -Path $env:ANDROID_USER_HOME | Out-Null
 if (!(Test-Path -LiteralPath $credentialPath)) {
     $bytes = New-Object byte[] 32
     $random = [System.Security.Cryptography.RandomNumberGenerator]::Create()
@@ -28,10 +30,10 @@ try {
     }
     Push-Location (Join-Path $projectRoot 'android')
     try {
-        $buildArguments = @(':app:assembleRelease', '-PmoonlightPreview=true', '-PreactNativeArchitectures=arm64-v8a', '--console=plain', '--max-workers=2')
+        $buildArguments = @(':app:assembleRelease', '-PmoonlightPreview=true', '-PreactNativeArchitectures=arm64-v8a', '--console=plain', '--max-workers=2', '--no-daemon')
         if ($ReuseNativeBinaries) {
             if (!(Test-Path (Join-Path $projectRoot 'android\app\build\outputs\apk\release\app-release.apk'))) { throw 'Build a full release before reusing native binaries.' }
-            # For JS-only updates after a successful native build. Native source and dependencies must be unchanged.
+            # Reuse unchanged C/C++ outputs. Kotlin/Java/resources and JS still compile normally.
             foreach ($module in @('app', 'llama.rn', 'react-native-mmkv', 'react-native-nitro-modules', 'react-native-screens')) {
                 $buildArguments += @('-x', ":${module}:buildCMakeRelWithDebInfo[arm64-v8a]")
             }
@@ -41,7 +43,7 @@ try {
     } finally { Pop-Location }
     $outputDir = Join-Path $projectRoot 'releases'
     New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-    $apkPath = Join-Path $outputDir 'Moonlight-1.1.0-preview-arm64.apk'
+    $apkPath = Join-Path $outputDir 'Moonlight-1.3.3-Preview-arm64.apk'
     Copy-Item -LiteralPath (Join-Path $projectRoot 'android\app\build\outputs\apk\release\app-release.apk') -Destination $apkPath
     & "$env:ANDROID_HOME\build-tools\36.0.0\apksigner.bat" verify --verbose $apkPath
     if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }

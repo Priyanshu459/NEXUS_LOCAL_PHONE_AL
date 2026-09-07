@@ -1,5 +1,6 @@
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
@@ -8,15 +9,15 @@ import { AVAILABLE_MODELS } from '../constants/models';
 type Props = NativeStackScreenProps<RootStackParamList, 'ModelAttribution'>;
 
 const C = {
-  bg: '#141517',
-  surface: '#1D1F22',
-  surfaceHigh: '#292C31',
+  get bg() { return Theme.color.background; },
+  get surface() { return Theme.color.surface; },
+  get surfaceHigh() { return Theme.color.surfaceRaised; },
   border: 'rgba(255, 255, 255, 0.10)',
-  textPrimary: '#F3F4F6',
-  textSecondary: '#B5BAC3',
-  textMuted: '#929AA6',
-  accent: '#A8C7FA',
-  red: '#E99797',
+  get textPrimary() { return Theme.color.text; },
+  get textSecondary() { return Theme.color.textSecondary; },
+  get textMuted() { return Theme.color.textMuted; },
+  get accent() { return Theme.color.accent; },
+  get red() { return Theme.color.destructive; },
 };
 
 const attributionData: Record<string, {
@@ -64,6 +65,7 @@ const attributionData: Record<string, {
 };
 
 export function ModelAttributionScreen({ navigation }: Props) {
+  useAppearance();
   const insets = useSafeAreaInsets();
 
   return (
@@ -86,8 +88,10 @@ export function ModelAttributionScreen({ navigation }: Props) {
         </Text>
 
         {AVAILABLE_MODELS.map(model => {
-          const attr = attributionData[model.id];
-          if (!attr) return null;
+          const attr = attributionData[model.id] || {
+            originalPublisher: model.originalPublisher, originalModelLink: model.originalModelUrl,
+            ggufPublisher: model.quantizationPublisher, license: model.licenseIdentifier,
+          };
 
           const isUnverified = attr.license.includes('Unverified');
 
@@ -139,7 +143,7 @@ export function ModelAttributionScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: C.bg },
   header: {
     flexDirection: 'row',
@@ -212,4 +216,4 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
   }
-});
+}));

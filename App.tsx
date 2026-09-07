@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Theme, useAppearance, isDark } from './src/constants/theme';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ChatScreen } from './src/screens/ChatScreen';
@@ -13,11 +13,13 @@ import { ModelsScreen } from './src/screens/ModelsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 import { ModelAttributionScreen } from './src/screens/ModelAttributionScreen';
 import MoonlightSplash from './src/components/MoonlightSplash';
-import { MoonDock } from './src/components/MoonDock';
+
 
 export type RootStackParamList = {
-  MainTabs: undefined;
-  Chat: { initialPrompt?: string; conversationId?: string; newConversation?: boolean } | undefined;
+  Home: undefined;
+  Tools: undefined;
+  Models: undefined;
+  Chat: { initialPrompt?: string; conversationId?: string; newConversation?: boolean; openHistory?: boolean } | undefined;
   Settings: undefined;
   PrivacyPolicy: undefined;
   ModelAttribution: undefined;
@@ -30,22 +32,8 @@ export type MainTabParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const Tab = createBottomTabNavigator<MainTabParamList>();
-
-function MainTabs() {
-  return (
-    <Tab.Navigator
-      tabBar={props => <MoonDock {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tab.Screen name="Home" component={WorkspaceScreen} />
-      <Tab.Screen name="Tools" component={GalleryScreen} />
-      <Tab.Screen name="Models" component={ModelsScreen} />
-    </Tab.Navigator>
-  );
-}
-
 function App(): React.JSX.Element {
+  useAppearance();
   const [splashDone, setSplashDone] = useState(false);
 
   const handleSplashFinish = useCallback(() => {
@@ -59,22 +47,24 @@ function App(): React.JSX.Element {
   return (
     <SafeAreaProvider>
       <StatusBar
-        barStyle="light-content"
+        barStyle={isDark() ? 'light-content' : 'dark-content'}
         translucent
         backgroundColor="transparent"
       />
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="MainTabs"
+          initialRouteName="Chat"
           screenOptions={{
             headerShown: false,
             animation: 'fade_from_bottom',
             contentStyle: {
-              backgroundColor: '#141517',
+              backgroundColor: Theme.color.background,
             },
           }}
         >
-          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="Home" component={WorkspaceScreen} />
+          <Stack.Screen name="Tools" component={GalleryScreen} />
+          <Stack.Screen name="Models" component={ModelsScreen} />
           <Stack.Screen name="Chat" component={ChatScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />

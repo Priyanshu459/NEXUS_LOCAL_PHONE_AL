@@ -1,6 +1,9 @@
 package com.moonknightstudio.moonlightai
 
 import android.app.Activity
+import android.app.ActivityManager
+import android.os.StatFs
+import android.os.Build
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -16,9 +19,13 @@ import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.util.Locale
+import java.net.URL
+import javax.net.ssl.HttpsURLConnection
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
+import java.io.ByteArrayOutputStream
+import org.json.JSONObject
 
 class DeviceControlModule(
   private val appContext: ReactApplicationContext,
@@ -26,11 +33,69 @@ class DeviceControlModule(
   companion object {
     private const val SPEECH_REQUEST_CODE = 4100
     private const val FILE_REQUEST_CODE = 4101
-    private const val MAX_TEXT_FILE_BYTES = 512 * 1024L
+    private val MAX_TEXT_FILE_BYTES = BoundedTextReader.MAX_BYTES.toLong()
   }
 
   private var speechPromise: Promise? = null
   private var filePromise: Promise? = null
+  private data class SearchRequest(val connection: HttpsURLConnection, val cancelled: AtomicBoolean = AtomicBoolean(false))
+  private val searches = ConcurrentHashMap<String, SearchRequest>()
+
+  @ReactMethod
+  fun cancelWebSearch(requestId: String) {
+    searches[requestId]?.let { it.cancelled.set(true); it.connection.disconnect() }
+  }
+
+  @ReactMethod
+  fun requestWebSearch(requestId: String, endpoint: String, code: String, query: String, promise: Promise) {
+    try {
+      val url = URL(endpoint)
+      require(url.protocol == "https" && url.userInfo == null && url.query == null && url.ref == null)
+      require(query.isNotBlank() && query.length <= 400 && code.matches(Regex("[A-Za-z0-9_-]{32,128}")))
+      require(searches.isEmpty()) { "A search is already running" }
+      val connection = url.openConnection() as HttpsURLConnection
+      val request = SearchRequest(connection)
+      searches[requestId] = request
+      Thread {
+        try {
+          if (request.cancelled.get()) throw IllegalStateException("Cancelled")
+          connection.instanceFollowRedirects = false
+          connection.connectTimeout = 10000
+          connection.readTimeout = 10000
+          connection.requestMethod = "POST"
+          connection.doOutput = true
+          connection.setRequestProperty("Content-Type", "application/json")
+          connection.setRequestProperty("Authorization", "Bearer $code")
+          val payload = JSONObject().put("query", query).toString().toByteArray(Charsets.UTF_8)
+          connection.setFixedLengthStreamingMode(payload.size)
+          connection.outputStream.use { it.write(payload) }
+          val status = connection.responseCode
+          val output = ByteArrayOutputStream()
+          // Never follow redirects with tester credentials, or buffer unbounded responses.
+          if (status == 200) connection.inputStream.use { stream ->
+            val buffer = ByteArray(2048)
+            while (true) {
+              if (request.cancelled.get()) throw IllegalStateException("Cancelled")
+              val count = stream.read(buffer)
+              if (count < 0) break
+              require(output.size() + count <= 16000) { "Response too large" }
+              output.write(buffer, 0, count)
+            }
+          }
+          if (request.cancelled.get()) throw IllegalStateException("Cancelled")
+          val result = Arguments.createMap()
+          result.putInt("status", status)
+          result.putString("body", output.toString("UTF-8"))
+          promise.resolve(result)
+        } catch (error: Exception) {
+          promise.reject("SEARCH_FAILED", "Search could not complete. Check the connection or try again.")
+        } finally {
+          connection.disconnect()
+          searches.remove(requestId)
+        }
+      }.start()
+    } catch (error: Exception) { promise.reject("SEARCH_CONFIG", "Search connection is invalid or busy.") }
+  }
 
   private val activityEventListener: ActivityEventListener =
     object : BaseActivityEventListener() {
@@ -52,6 +117,24 @@ class DeviceControlModule(
   }
 
   override fun getName(): String = "DeviceControl"
+
+  @ReactMethod
+  fun getDeviceCapacity(promise: Promise) {
+    try {
+      val manager = appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+      val info = ActivityManager.MemoryInfo()
+      manager.getMemoryInfo(info)
+      val disk = StatFs(appContext.filesDir.absolutePath)
+      promise.resolve(Arguments.createMap().apply {
+        putDouble("totalMemory", info.totalMem.toDouble())
+        putDouble("availableMemory", info.availMem.toDouble())
+        putDouble("freeStorage", disk.availableBytes.toDouble())
+        putBoolean("is64Bit", Build.SUPPORTED_64_BIT_ABIS.isNotEmpty())
+      })
+    } catch (error: Exception) {
+      promise.reject("CAPACITY_ERROR", "Could not check device capacity.", error)
+    }
+  }
 
   @ReactMethod
   fun startSpeechRecognition(promise: Promise) {
@@ -187,18 +270,7 @@ class DeviceControlModule(
   private fun readTextContent(activity: Activity, uri: Uri): String {
     val input = activity.contentResolver.openInputStream(uri)
       ?: throw IllegalStateException("Unable to open the selected file")
-    val output = StringBuilder()
-    input.use { stream ->
-      BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).useLines { lines ->
-        var characters = 0
-        lines.take(2000).takeWhile { characters < MAX_TEXT_FILE_BYTES }.forEach { line ->
-          val cleanLine = line.replace(Regex("[\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]"), "")
-          output.append(cleanLine).append('\n')
-          characters += cleanLine.length + 1
-        }
-      }
-    }
-    return output.toString()
+    return input.use { stream -> BoundedTextReader.read(stream) }
   }
 
   @ReactMethod

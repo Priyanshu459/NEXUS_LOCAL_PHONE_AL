@@ -1,7 +1,7 @@
 import { formatMessagesForModel } from '../src/services/chatFormatting';
 import { loadChatHistory, storage, getSettings, saveSettings } from '../src/services/storage';
 import { downloadModel } from '../src/services/modelManager';
-import { AVAILABLE_MODELS } from '../src/constants/models';
+import { AVAILABLE_MODELS, MODEL_CATALOG } from '../src/constants/models';
 import RNFS from 'react-native-fs';
 jest.mock('react-native-fs', () => ({
   getFSInfo: jest.fn(),
@@ -119,7 +119,7 @@ describe('Validation Tests', () => {
         })
       };
 
-      const dsModel = AVAILABLE_MODELS.find(m => m.id.includes('deepseek'));
+      const dsModel = MODEL_CATALOG.find(m => m.id.includes('deepseek'));
       const res = await formatMessagesForModel(llamaMock as any, {
         messages: [],
         systemPrompt: '',

@@ -5,8 +5,12 @@ import { SettingsScreen } from '../src/screens/SettingsScreen';
 import { GalleryScreen } from '../src/screens/GalleryScreen';
 import { ChatScreen } from '../src/screens/ChatScreen';
 import { getSettings, storage } from '../src/services/storage';
+import {disconnectSearch, saveSearchConnection} from '../src/services/webSearch';
 
 jest.setTimeout(30000);
+jest.mock('@react-navigation/native', () => ({
+  ...jest.requireActual('@react-navigation/native'), useIsFocused: () => true,
+}));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }),
 }));
@@ -14,6 +18,7 @@ const navigation = {
   navigate: jest.fn(),
   goBack: jest.fn(),
   addListener: jest.fn(() => () => {}),
+  setParams: jest.fn(),
 };
 const button = (view: Renderer.ReactTestRenderer, text: string) =>
   view.root
@@ -21,15 +26,39 @@ const button = (view: Renderer.ReactTestRenderer, text: string) =>
     .find(b => b.findAllByType(Text).some(t => t.props.children === text))!;
 beforeEach(() => {
   storage.clearAll();
+  disconnectSearch();
   jest.clearAllMocks();
+});
+
+test('alpha search settings expose a masked key and server address', async () => {
+  let view!: Renderer.ReactTestRenderer;
+  await act(async () => {view = Renderer.create(<SettingsScreen navigation={navigation} />);});
+  await act(async () => button(view, 'Web search').props.onPress());
+  expect(view.root.findAllByType(TextInput)).toHaveLength(2);
+  expect(view.root.findByProps({accessibilityLabel:'Alpha search access code'}).props.secureTextEntry).toBe(true);
+  expect(JSON.stringify(view.toJSON())).toContain('Set up your connection');
+  await act(async () => view.unmount());
+});
+
+test('web toggle enables automatic search without a query form or an immediate request', async () => {
+  saveSearchConnection('https://search.example.com/search','a'.repeat(43));
+  NativeModules.DeviceControl.requestWebSearch = jest.fn();
+  let view!: Renderer.ReactTestRenderer;
+  await act(async()=>{view=Renderer.create(<ChatScreen navigation={navigation as any} route={{params:{}} as any}/>);});
+  await act(async()=>view.root.findAllByType(TouchableOpacity).find(b=>b.props.accessibilityLabel==='Web search')!.props.onPress());
+  expect(NativeModules.DeviceControl.requestWebSearch).not.toHaveBeenCalled();
+  expect(view.root.findAllByType(TextInput).find(i=>i.props.accessibilityLabel==='Search query')).toBeUndefined();
+  expect(view.root.findAllByType(TouchableOpacity).find(b=>b.props.accessibilityLabel==='Web search')!.props.accessibilityState.checked).toBe(true);
+  await act(async()=>view.unmount());
 });
 test('response presets and personal instructions persist through the real controls', async () => {
   let view!: Renderer.ReactTestRenderer;
   await act(async () => {
     view = Renderer.create(<SettingsScreen navigation={navigation} />);
   });
-  await act(async () => button(view, 'Precise').props.onPress());
-  expect(getSettings().temperature).toBe(0.2);
+  await act(async () => button(view, 'Responses').props.onPress());
+  await act(async () => button(view, 'Concise').props.onPress());
+  expect(getSettings().responseStyle).toBe('concise');
   const input = view.root
     .findAllByType(TextInput)
     .find(i => i.props.accessibilityLabel === 'Personal instructions')!;
@@ -79,7 +108,7 @@ test('dictation stays in the composer for review and send is disabled without a 
   await act(async () =>
     view.root
       .findAllByType(TouchableOpacity)
-      .find(b => b.props.accessibilityLabel === 'Dictate message')!
+      .find(b => b.props.accessibilityLabel === 'Speak and send message')!
       .props.onPress(),
   );
   expect(
@@ -109,4 +138,3 @@ test('stopping generation safely handles non-promise stopCompletion without thro
   // Verify unmounting safely stops completion without throwing
   await expect(act(async () => view.unmount())).resolves.not.toThrow();
 });
-

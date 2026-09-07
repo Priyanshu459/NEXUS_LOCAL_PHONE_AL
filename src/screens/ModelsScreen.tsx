@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -11,8 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../components/AppHeader';
 import { AVAILABLE_MODELS } from '../constants/models';
 import { DOCK_RESERVED_SPACE } from '../constants/layout';
-import { PageIntro } from '../components/Design';
-import { Theme } from '../constants/theme';
+import { PageIntro, IconButton } from '../components/Design';
+import {getDeviceRecommendation} from '../services/deviceRecommendation';
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import { getSettings, saveSettings } from '../services/storage';
 import {
   cancelDownload,
@@ -25,6 +25,7 @@ import {
 type InstallationMap = Record<string, boolean>;
 
 export function ModelsScreen({ navigation }: any) {
+  useAppearance();
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState(getSettings());
   const [installed, setInstalled] = useState<InstallationMap>({});
@@ -32,6 +33,9 @@ export function ModelsScreen({ navigation }: any) {
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [loadError, setLoadError] = useState(false);
+  const [suggested, setSuggested] = useState('');
+  const [capacityNote, setCapacityNote] = useState('');
+  useEffect(()=>{let active=true;getDeviceRecommendation().then(r=>{if(active){setSuggested(r.model.id);setCapacityNote(r.reason);}});return()=>{active=false;};},[]);
 
   const refreshInstallations = useCallback(async () => {
     setChecking(true);
@@ -149,7 +153,7 @@ export function ModelsScreen({ navigation }: any) {
       <AppHeader
         title="Your models"
         subtitle="A little intelligence, kept close"
-        onMenuPress={() => navigation.navigate('Settings')}
+        trailing={<IconButton glyph="‹" label="Back to chat" disabled={!!downloadingUrl} onPress={() => navigation.goBack()} />}
       />
       <ScrollView
         contentContainerStyle={[
@@ -160,8 +164,8 @@ export function ModelsScreen({ navigation }: any) {
       >
         <PageIntro
           eyebrow="INTELLIGENCE, ON DEVICE"
-          title="Find your thinking partner."
-          body="Download once. Keep it close. Choose a model that fits your phone and the way you like to work."
+          title="Find the right fit."
+          body={capacityNote || 'Choose a model for your phone. Larger models need more available memory.'}
         />
         {loadError && (
           <TouchableOpacity
@@ -175,7 +179,7 @@ export function ModelsScreen({ navigation }: any) {
             <Text style={styles.noticeText}>Tap to try again.</Text>
           </TouchableOpacity>
         )}
-        {AVAILABLE_MODELS.map(model => {
+        {[...AVAILABLE_MODELS].sort((a,b)=>Number(b.id===suggested)-Number(a.id===suggested)).map(model => {
           const isActive = settings.modelUrl === model.url;
           const isInstalled = !!installed[model.url];
           const isDownloading = downloadingUrl === model.url;
@@ -223,6 +227,7 @@ export function ModelsScreen({ navigation }: any) {
                 </View>
               </View>
               <Text style={styles.modelName}>{model.name}</Text>
+              {model.id === suggested && <Text style={styles.noticeText}>Suggested for available device capacity</Text>}
               <Text style={styles.description}>{model.desc}</Text>
               <View style={styles.metadata}>
                 <Text style={styles.metadataText}>{model.size}</Text>
@@ -382,7 +387,7 @@ export function ModelsScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: Theme.color.background },
   content: { padding: Theme.space.lg, gap: Theme.space.md },
   notice: {
@@ -404,7 +409,7 @@ const styles = StyleSheet.create({
     borderColor: Theme.color.border,
     padding: Theme.space.lg,
   },
-  activeCard: { borderColor: Theme.color.accent, backgroundColor: '#202730' },
+  activeCard: { borderColor: Theme.color.accent, backgroundColor: Theme.color.accentSoft },
   cardTopRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -521,4 +526,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 5,
   },
-});
+}));

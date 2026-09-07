@@ -8,6 +8,7 @@ export const SETTINGS_KEY = 'app_settings';
 export const CHAT_HISTORY_KEY = 'chat_history';
 
 export interface AppSettings {
+  responseStyle?: 'concise' | 'balanced' | 'detailed';
   systemPrompt: string;
   temperature: number;
   top_p: number;
@@ -18,6 +19,7 @@ export interface AppSettings {
 }
 
 export const defaultSettings: AppSettings = {
+  responseStyle: 'balanced',
   systemPrompt: 'You are a helpful, respectful, and honest local AI assistant. Always answer as helpfully as possible, while being safe.',
   temperature: 0.7,
   top_p: 0.9,
@@ -53,6 +55,7 @@ const sanitizeSettings = (value: unknown): AppSettings => {
   };
 
   return {
+    responseStyle: value.responseStyle === 'concise' || value.responseStyle === 'detailed' ? value.responseStyle : 'balanced',
     systemPrompt: typeof value.systemPrompt === 'string' && value.systemPrompt.trim()
       ? value.systemPrompt
       : defaultSettings.systemPrompt,
@@ -81,6 +84,7 @@ export interface PersistedMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  sources?: import('./webSearch').WebSource[];
 }
 
 export const loadChatHistory = (): PersistedMessage[] => {

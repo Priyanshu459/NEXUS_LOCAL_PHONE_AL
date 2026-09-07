@@ -1,4 +1,5 @@
 import { storage, loadChatHistory, PersistedMessage } from './storage';
+import {sanitizeSources} from './webSearch';
 
 const KEY = 'conversations_v1';
 export interface Conversation {
@@ -45,6 +46,7 @@ export function listConversations(): Conversation[] {
               ['user', 'assistant'].includes(m.role),
           ),
       )
+      .map((c: Conversation) => ({...c,messages:c.messages.map(m=>({...m,sources:sanitizeSources(m.sources)}))}))
       .sort((a: Conversation, b: Conversation) => b.updatedAt - a.updatedAt);
   } catch {
     return [];
@@ -75,6 +77,11 @@ export function deleteConversation(id: string) {
     KEY,
     JSON.stringify(listConversations().filter(c => c.id !== id)),
   );
+}
+
+export function clearConversations() {
+  storage.set(KEY, '[]');
+  storage.remove('chat_history');
 }
 
 export function renameConversation(id: string, title: string) {

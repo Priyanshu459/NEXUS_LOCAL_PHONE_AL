@@ -379,7 +379,7 @@ describe('downloadModel', () => {
     );
 
     await expect(
-      downloadModel('https://example.com/model.gguf', 'model.gguf', progress),
+      downloadModel('https://huggingface.co/org/repo/resolve/main/model.gguf', 'model.gguf', progress),
     ).resolves.toBe('/tmp/model.gguf');
 
     expect(RNFS.moveFile).toHaveBeenCalledWith(
@@ -418,7 +418,7 @@ describe('downloadModel', () => {
     });
 
     await expect(
-      downloadModel('https://example.com/bad.gguf', 'bad.gguf', jest.fn()),
+      downloadModel('https://huggingface.co/org/repo/resolve/main/bad.gguf', 'bad.gguf', jest.fn()),
     ).rejects.toThrow('Download interrupted');
 
     expect(RNFS.unlink).toHaveBeenCalledWith('/tmp/bad.gguf.tmp');
@@ -432,7 +432,7 @@ describe('downloadModel', () => {
     });
 
     await expect(
-      downloadModel('https://example.com/model.gguf', 'model.gguf', jest.fn()),
+      downloadModel('https://huggingface.co/org/repo/resolve/main/model.gguf', 'model.gguf', jest.fn()),
     ).rejects.toThrow(/gated or private/i);
   });
 
@@ -444,7 +444,7 @@ describe('downloadModel', () => {
     });
 
     await expect(
-      downloadModel('https://example.com/model.gguf', 'model.gguf', jest.fn()),
+      downloadModel('https://huggingface.co/org/repo/resolve/main/model.gguf', 'model.gguf', jest.fn()),
     ).rejects.toThrow(/does not exist/i);
   });
 
@@ -456,14 +456,14 @@ describe('downloadModel', () => {
     });
 
     await expect(
-      downloadModel('https://example.com/model.gguf', 'model.gguf', jest.fn()),
+      downloadModel('https://huggingface.co/org/repo/resolve/main/model.gguf', 'model.gguf', jest.fn()),
     ).rejects.toThrow(/gated or private/i);
   });
 
   it('does not re-download a file that already exists', async () => {
     (RNFS.exists as jest.Mock).mockResolvedValue(true); // file exists
     const result = await downloadModel(
-      'https://example.com/model.gguf',
+      'https://huggingface.co/org/repo/resolve/main/model.gguf',
       'model.gguf',
       jest.fn(),
     );
@@ -480,7 +480,7 @@ describe('downloadModel', () => {
       promise: Promise.resolve({ statusCode: 200 }),
     });
 
-    await downloadModel('https://example.com/model.gguf', 'model.gguf', jest.fn());
+    await downloadModel('https://huggingface.co/org/repo/resolve/main/model.gguf', 'model.gguf', jest.fn());
 
     expect(RNFS.unlink).toHaveBeenCalledWith('/tmp/model.gguf.tmp');
   });
@@ -493,7 +493,7 @@ describe('downloadModel', () => {
     });
 
     await expect(
-      downloadModel('https://example.com/model.gguf', 'model.gguf', jest.fn()),
+      downloadModel('https://huggingface.co/org/repo/resolve/main/model.gguf', 'model.gguf', jest.fn()),
     ).rejects.toThrow('canceled');
   });
 });

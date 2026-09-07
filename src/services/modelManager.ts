@@ -108,7 +108,12 @@ export function parseHuggingFaceUrl(raw: string): ParsedHfUrl | null {
     // Rebuild the file path from remaining segments, preserving slashes
     const rawFilePath = rest.join('/');
     // Decode the path for display / extension detection
-    const decodedFilePath = decodeURIComponent(rawFilePath);
+    let decodedFilePath: string;
+    try {
+      decodedFilePath = decodeURIComponent(rawFilePath);
+    } catch {
+      return null;
+    }
     const fileExtension = decodedFilePath.split('.').pop()?.toLowerCase() ?? null;
     const filename = decodedFilePath.split('/').pop() ?? null;
 
@@ -208,7 +213,7 @@ export const resolveHuggingFaceModelUrl = async (
 ): Promise<ResolvedModelDownload> => {
   const parsed = parseHuggingFaceUrl(rawUrl);
   if (!parsed) {
-    return { url: rawUrl, filename: getModelFilenameFromUrl(rawUrl) };
+    throw new Error('Use a valid HTTPS huggingface.co model URL.');
   }
 
   if (parsed.isDirectFile && parsed.filename) {
@@ -295,7 +300,12 @@ export const getModelFilenameFromUrl = (url: string): string => {
 
   const rawName =
     url.split('/').pop()?.split('?')[0] || FALLBACK_MODEL_FILENAME;
-  const decodedName = decodeURIComponent(rawName);
+  let decodedName: string;
+  try {
+    decodedName = decodeURIComponent(rawName);
+  } catch {
+    return FALLBACK_MODEL_FILENAME;
+  }
   const safeName = decodedName.replace(/[^a-zA-Z0-9._-]/g, '_');
 
   if (!safeName.toLowerCase().endsWith('.gguf')) {

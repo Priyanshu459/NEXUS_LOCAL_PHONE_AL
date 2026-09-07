@@ -1,15 +1,14 @@
 import React from 'react';
 import {
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '../components/AppHeader';
-import { PageIntro, ui } from '../components/Design';
-import { Theme } from '../constants/theme';
+import { PageIntro, ui, IconButton } from '../components/Design';
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import { DOCK_RESERVED_SPACE } from '../constants/layout';
 const tasks = [
   {
@@ -54,12 +53,13 @@ const tasks = [
   },
 ];
 export function GalleryScreen({ navigation }: any) {
+  useAppearance();
   const insets = useSafeAreaInsets();
   return (
     <View style={[ui.screen, { paddingTop: insets.top }]}>
       <AppHeader
         title="Explore"
-        onMenuPress={() => navigation.navigate('Settings')}
+        trailing={<IconButton glyph="‹" label="Back to chat" onPress={() => navigation.goBack()} />}
       />
       <ScrollView
         contentContainerStyle={[
@@ -98,7 +98,7 @@ export function GalleryScreen({ navigation }: any) {
     </View>
   );
 }
-const S = StyleSheet.create({
+const S = themedStyles(() => ({
   card: {
     padding: 22,
     backgroundColor: Theme.color.surface,
@@ -127,4 +127,4 @@ const S = StyleSheet.create({
     marginTop: 14,
     fontWeight: '600',
   },
-});
+}));

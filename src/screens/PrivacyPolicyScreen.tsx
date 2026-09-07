@@ -1,10 +1,10 @@
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Alert,
   Linking,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -23,6 +23,7 @@ import {
 type Props = NativeStackScreenProps<RootStackParamList, 'PrivacyPolicy'>;
 
 export function PrivacyPolicyScreen({ navigation }: Props) {
+  useAppearance();
   const insets = useSafeAreaInsets();
   const published = hasPublishedPrivacyPolicy();
   const openLink = async (url: string) => {
@@ -58,7 +59,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.updated}>Effective date: August 26, 2026</Text>
+        <Text style={styles.updated}>Effective date: September 7, 2026</Text>
         <Text style={styles.heading}>Local data</Text>
         <Text style={styles.body}>
           Chats, settings, saved memories, downloaded GGUF models, and text read
@@ -74,6 +75,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           policy.
         </Text>
         <Text style={styles.heading}>Documents and speech</Text>
+        <Text style={styles.body}>When Web is on, Moonlight automatically sends the first 400 characters of each new typed or spoken message to the configured search backend and its upstream search engines. Web stays on until disabled or the app restarts. Saved history, memories and attachments are not uploaded. The alpha backend stores access-code hashes and daily request counts, not queries or results. Infrastructure providers may retain network metadata. Source links and excerpts are saved with the conversation; opening a source contacts that site. The access code is kept only in app-session memory.</Text>
         <Text style={styles.body}>
           The Android system document picker grants access only to a document
           you select. Supported text is read into the current local chat. Voice
@@ -151,8 +153,8 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#141517' },
+const styles = themedStyles(() => ({
+  screen: { flex: 1, backgroundColor: Theme.color.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -162,27 +164,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.10)',
   },
-  back: { color: '#A8C7FA', fontSize: 15, fontWeight: '700' },
-  title: { color: '#F3F4F6', fontSize: 18, fontWeight: '800' },
+  back: { color: Theme.color.accent, fontSize: 15, fontWeight: '700' },
+  title: { color: Theme.color.text, fontSize: 18, fontWeight: '800' },
   headerSpacer: { width: 36 },
   content: { padding: 20, paddingBottom: 48 },
-  updated: { color: '#929AA6', marginBottom: 16 },
+  updated: { color: Theme.color.textMuted, marginBottom: 16 },
   heading: {
-    color: '#F3F4F6',
+    color: Theme.color.text,
     fontSize: 16,
     fontWeight: '800',
     marginTop: 18,
     marginBottom: 6,
   },
-  body: { color: '#B5BAC3', fontSize: 14, lineHeight: 21 },
+  body: { color: Theme.color.textSecondary, fontSize: 14, lineHeight: 21 },
   linkButton: {
     marginTop: 24,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: '#252F3F',
+    backgroundColor: Theme.color.accentSoft,
     alignItems: 'center',
   },
   textLink: { marginTop: 14, alignSelf: 'flex-start' },
-  linkText: { color: '#A8C7FA', fontWeight: '800' },
-  pending: { marginTop: 24, color: '#FFB86B', fontSize: 13, lineHeight: 19 },
-});
+  linkText: { color: Theme.color.accent, fontWeight: '800' },
+  pending: { marginTop: 24, color: Theme.color.warning, fontSize: 13, lineHeight: 19 },
+}));

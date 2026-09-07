@@ -20,7 +20,19 @@ export interface ModelMetadata {
   isLicenseVerified: boolean;
 }
 
-export const AVAILABLE_MODELS: ModelMetadata[] = [
+export const MODEL_CATALOG: ModelMetadata[] = [
+  {
+    id: 'moonlight-v7', name: 'Moonlight Qwen3 4B v7',
+    desc: 'Moonlight’s own model for English and Hinglish. Suggested on phones with sufficient available memory; performance varies by device.',
+    url: 'https://huggingface.co/moonlight-labs/moonlight-qwen3-4b-v7/resolve/a83684b2b8251fd4c11d0beb379111cdc19e64c4/moonlight-qwen3-v7-q8_0.gguf',
+    sha256: '589133dca71f85d52c13311d282015aa7fa3922458f5d3732ae5b8c64f9c816a',
+    color: '#234737', size: '4.28 GB', expectedSizeBytes: 4280400608,
+    provider: 'Moonlight Labs', badge: 'Moonlight', tags: ['GGUF', 'Q8_0', 'Higher RAM'],
+    originalPublisher: 'Qwen / Alibaba Cloud', quantizationPublisher: 'Moonlight Labs',
+    originalModelUrl: 'https://huggingface.co/Qwen/Qwen3-4B',
+    quantizedRepoUrl: 'https://huggingface.co/moonlight-labs/moonlight-qwen3-4b-v7',
+    licenseIdentifier: 'Apache 2.0', licenseUrl: 'https://www.apache.org/licenses/LICENSE-2.0', isLicenseVerified: true,
+  },
   {
     id: 'llama32-1b',
     name: 'Llama 3.2 1B',
@@ -136,3 +148,8 @@ export const AVAILABLE_MODELS: ModelMetadata[] = [
     isLicenseVerified: true
   }
 ];
+
+// Restrict this phone-test release to compact models pending the freeze investigation.
+export const AVAILABLE_MODELS = MODEL_CATALOG.filter(model =>
+  model.id === 'llama32-1b' || model.id === 'qwen25-15b',
+);

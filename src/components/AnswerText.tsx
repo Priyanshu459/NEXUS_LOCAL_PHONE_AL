@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {Theme, themedStyles, useAppearance, getAppearance} from '../constants/theme';
 
 function inline(text: string) {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => (
@@ -23,6 +24,7 @@ function inline(text: string) {
 }
 
 export function AnswerText({ content }: { content: string }) {
+  useAppearance();
   return (
     <View>
       {content.split('```').map((block, i) => {
@@ -58,26 +60,26 @@ export function AnswerText({ content }: { content: string }) {
     </View>
   );
 }
-const S = StyleSheet.create({
-  text: { color: '#F3F4F6', fontSize: 15, lineHeight: 24 },
+const S = themedStyles(() => ({
+  text: { color: Theme.color.text, fontSize: getAppearance().largeText ? 20 : 16, lineHeight: getAppearance().largeText ? 30 : 26 },
   bold: { fontWeight: '700' },
   heading: { fontWeight: '700', fontSize: 18, marginVertical: 8 },
   inlineCode: {
     fontFamily: 'monospace',
-    color: '#A8C7FA',
-    backgroundColor: '#252F3F',
+    color: Theme.color.accent,
+    backgroundColor: Theme.color.accentSoft,
   },
   codeBox: {
-    backgroundColor: '#101113',
+    backgroundColor: Theme.color.surfaceRaised,
     borderRadius: 12,
     padding: 12,
     marginVertical: 10,
   },
-  language: { color: '#929AA6', fontSize: 11, marginBottom: 8 },
+  language: { color: Theme.color.textMuted, fontSize: 11, marginBottom: 8 },
   code: {
-    color: '#DEE3EB',
+    color: Theme.color.text,
     fontFamily: 'monospace',
     fontSize: 13,
     lineHeight: 21,
   },
-});
+}));

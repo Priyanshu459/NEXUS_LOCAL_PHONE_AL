@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Theme } from '../constants/theme';
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import { IconButton, MoonMark } from './Design';
 type Props = {
   title: string;
@@ -16,6 +16,7 @@ export function AppHeader({
   trailing,
   showBrand = true,
 }: Props) {
+  useAppearance();
   return (
     <View style={S.header}>
       {showBrand && <MoonMark size={30} />}
@@ -30,7 +31,7 @@ export function AppHeader({
     </View>
   );
 }
-const S = StyleSheet.create({
+const S = themedStyles(() => ({
   header: {
     minHeight: 72,
     paddingHorizontal: 22,
@@ -52,4 +53,4 @@ const S = StyleSheet.create({
     marginTop: 3,
     lineHeight: 16,
   },
-});
+}));

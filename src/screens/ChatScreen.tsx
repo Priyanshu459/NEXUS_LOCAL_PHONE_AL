@@ -4,18 +4,22 @@ import {
   Alert,
   FlatList,
   Keyboard,
+  Linking,
   KeyboardAvoidingView,
   Modal,
   NativeModules,
   Platform,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { ConversationDrawer } from '../components/ConversationDrawer';
+import { getDeviceRecommendation } from '../services/deviceRecommendation';
+import { storage, defaultSettings } from '../services/storage';
+import { getModelFilenameFromUrl } from '../services/modelManager';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
@@ -32,6 +36,8 @@ import {
   cancelDownload,
 } from '../services/modelManager';
 import { initLlama, LlamaContext } from 'llama.rn';
+import {checkLoadCapacity, serializeModelLoad} from '../services/modelLoadGuard';
+import {getSearchConnection, searchWeb, sanitizeSources, WebSource} from '../services/webSearch';
 import {
   getMemoryContextString,
   addMemory,
@@ -47,25 +53,25 @@ import { fitContext } from '../services/contextWindow';
 import { listConversations, saveConversation } from '../services/conversations';
 import { AnswerText } from '../components/AnswerText';
 import { MoonMark, IconButton, ui } from '../components/Design';
-import { Theme } from '../constants/theme';
+import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import { AVAILABLE_MODELS } from '../constants/models';
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 type Message = PersistedMessage;
-const MODEL_CONTEXT_SIZE = 2048;
+const MODEL_CONTEXT_SIZE = 1024;
 const generateUniqueId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const C = {
-  bg: Theme.color.background,
-  surface: Theme.color.surface,
-  surfaceHighlight: Theme.color.surfaceRaised,
-  border: Theme.color.border,
-  accent: Theme.color.accent,
-  accentSoft: Theme.color.accentSoft,
-  textPrimary: Theme.color.text,
-  textSecondary: Theme.color.textSecondary,
-  textMuted: Theme.color.textMuted,
-  green: Theme.color.success,
-  red: Theme.color.destructive,
+  get bg() { return Theme.color.background; },
+  get surface() { return Theme.color.surface; },
+  get surfaceHighlight() { return Theme.color.surfaceRaised; },
+  get border() { return Theme.color.border; },
+  get accent() { return Theme.color.accent; },
+  get accentSoft() { return Theme.color.accentSoft; },
+  get textPrimary() { return Theme.color.text; },
+  get textSecondary() { return Theme.color.textSecondary; },
+  get textMuted() { return Theme.color.textMuted; },
+  get green() { return Theme.color.success; },
+  get red() { return Theme.color.destructive; },
 };
 function ReportResponseModal({
   message,
@@ -74,6 +80,7 @@ function ReportResponseModal({
   message: Message | null;
   onClose: () => void;
 }) {
+  useAppearance();
   const reportingConfigured = isAiReportingConfigured();
   const [category, setCategory] = useState<AiReportCategory>(
     'Harmful or dangerous',
@@ -244,6 +251,13 @@ function ReportResponseModal({
 }
 
 export function ChatScreen({ navigation, route }: Props) {
+  const appearance = useAppearance();
+  const [drawer, setDrawer] = useState(false);
+  const [webEnabled, setWebEnabled] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchAbort = useRef<AbortController | null>(null);
+  const [recommendation, setRecommendation] = useState('');
+  const [recommendedId, setRecommendedId] = useState('');
   const conversationId = useRef(
     route.params?.conversationId || generateUniqueId(),
   );
@@ -251,10 +265,13 @@ export function ChatScreen({ navigation, route }: Props) {
   const cancelRequested = useRef(false);
   const mounted = useRef(true);
   const modelEpoch = useRef(0);
+  const downloadEpoch = useRef(0);
+  const releasePending = useRef<Promise<unknown>>(Promise.resolve());
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      searchAbort.current?.abort();
     };
   }, []);
   const [contextNotice, setContextNotice] = useState('');
@@ -280,6 +297,7 @@ export function ChatScreen({ navigation, route }: Props) {
   }, []);
 
   const startVoiceInput = async () => {
+    if (voiceModeActive || generationBusy.current) return;
     const deviceControl = NativeModules.DeviceControl;
     if (typeof deviceControl?.startSpeechRecognition !== 'function') {
       Alert.alert(
@@ -291,8 +309,14 @@ export function ChatScreen({ navigation, route }: Props) {
     try {
       setVoiceModeActive(true);
       const result = await deviceControl.startSpeechRecognition();
-      if (result && result.length > 0) {
-        setInputText(result);
+      if (mounted.current && typeof result === 'string' && result.trim()) {
+        Keyboard.dismiss();
+        if (llamaRef.current && !generationBusy.current) {
+          await handleSendMessage(result);
+        } else {
+          setInputText(result);
+          Alert.alert('Message saved', 'Your model is not ready. Send this message once it has loaded.');
+        }
       }
     } catch (e: any) {
       if (e?.code !== 'CANCELLED') {
@@ -304,20 +328,6 @@ export function ChatScreen({ navigation, route }: Props) {
     } finally {
       setVoiceModeActive(false);
     }
-  };
-
-  const showMemories = () => {
-    const mems = getMemoryContextString();
-    if (!mems) {
-      Alert.alert('Moon Core', 'No memories stored yet.');
-      return;
-    }
-    Alert.alert(
-      'Moon Core',
-      mems
-        .replace('Here are some facts to remember about the user:\n', '')
-        .trim(),
-    );
   };
   const [modelReady, setModelReady] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -353,9 +363,33 @@ export function ChatScreen({ navigation, route }: Props) {
   const llamaRef = useRef<LlamaContext | null>(null);
   const listRef = useRef<FlatList>(null);
 
-  const modelFilename =
-    settings.modelUrl.split('/').pop()?.split('?')[0] || 'model.gguf';
+  const modelFilename = getModelFilenameFromUrl(settings.modelUrl);
 
+  useEffect(() => {
+    let active = true;
+    getDeviceRecommendation().then(async result => {
+      if (!active) return;
+      setRecommendation(result.reason); setRecommendedId(result.model.id);
+      const saved = getSettings();
+      if (!storage.getString('model_recommendation_done') && saved.modelUrl === defaultSettings.modelUrl) {
+        const exists = await checkModelExists(getModelFilenameFromUrl(saved.modelUrl));
+        if (!active) return;
+        if (!exists) { const next = {...saved, modelUrl: result.model.url}; saveSettings(next); setSettings(next); }
+      }
+      storage.set('model_recommendation_done', 'true');
+    });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (route.params?.openHistory) { setDrawer(true); navigation.setParams({openHistory: false}); }
+    if (route.params?.conversationId) {
+      const found = listConversations().find(c => c.id === route.params?.conversationId);
+      if (found) { conversationId.current = found.id; setMessages(found.messages); }
+    } else if (route.params?.newConversation) {
+      conversationId.current = generateUniqueId(); setMessages([]);
+      navigation.setParams({newConversation: false});
+    }
+  }, [route.params?.conversationId, route.params?.newConversation, route.params?.openHistory, navigation]);
   useEffect(() => {
     if (route?.params?.initialPrompt) {
       setInputText(route.params.initialPrompt);
@@ -363,11 +397,18 @@ export function ChatScreen({ navigation, route }: Props) {
   }, [route?.params?.initialPrompt]);
 
   useEffect(() => {
-    const unsub = navigation.addListener('focus', () =>
-      setSettings(getSettings()),
-    );
+    const unsub = navigation.addListener('focus', () => {
+      setSettings(getSettings());
+      // A download may have completed in Models without changing the selected URL.
+      if (!llamaRef.current && getSettings().modelUrl === settings.modelUrl) {
+        void checkAndInit(modelEpoch.current);
+      }
+      if (messages.length && !listConversations().some(c => c.id === conversationId.current)) {
+        setMessages([]); conversationId.current = generateUniqueId();
+      }
+    });
     return unsub;
-  }, [navigation]);
+  }, [navigation, messages.length, settings.modelUrl]);
 
   useEffect(() => {
     setIsAppBooting(true);
@@ -380,6 +421,7 @@ export function ChatScreen({ navigation, route }: Props) {
       clearTimeout(initTimer);
       modelEpoch.current = epoch + 1;
       cancelRequested.current = true;
+      searchAbort.current?.abort();
       const context = llamaRef.current;
       llamaRef.current = null;
       if (context) {
@@ -391,6 +433,7 @@ export function ChatScreen({ navigation, route }: Props) {
         } catch {}
         try {
           const releaseRes = context.release() as unknown;
+          releasePending.current = Promise.resolve(releaseRes).catch(() => {});
           if (releaseRes && typeof (releaseRes as any).catch === 'function') {
             (releaseRes as Promise<any>).catch(() => {});
           }
@@ -423,6 +466,8 @@ export function ChatScreen({ navigation, route }: Props) {
   };
 
   const handleDownload = async (urlToDownload: string) => {
+    if (isDownloading) return;
+    const request = ++downloadEpoch.current;
     // If they picked a new model from the store
     if (urlToDownload !== settings.modelUrl) {
       const newSettings = { ...settings, modelUrl: urlToDownload };
@@ -440,7 +485,7 @@ export function ChatScreen({ navigation, route }: Props) {
         setDownloadProgress(p),
       );
       const downloadedFilename = downloadedPath.split('/').pop() || filename;
-      await initModel(downloadedFilename);
+      if (request === downloadEpoch.current && mounted.current) await initModel(downloadedFilename);
     } catch (e: any) {
       console.error(e);
       if (e.message && e.message.includes('canceled')) {
@@ -453,11 +498,12 @@ export function ChatScreen({ navigation, route }: Props) {
         );
       }
     } finally {
-      setIsDownloading(false);
+      if (request === downloadEpoch.current && mounted.current) setIsDownloading(false);
     }
   };
 
   const handleCancelDownload = () => {
+    downloadEpoch.current++;
     cancelDownload();
     setIsDownloading(false);
   };
@@ -465,20 +511,27 @@ export function ChatScreen({ navigation, route }: Props) {
   const initModel = async (
     specificFilename?: string,
     epoch = modelEpoch.current,
-  ) => {
-    if (!mounted.current || epoch !== modelEpoch.current) return;
+  ) => serializeModelLoad(async () => {
+    if (!mounted.current || epoch !== modelEpoch.current || llamaRef.current) return;
     const fileToLoad = specificFilename || modelFilename;
     try {
-      if (llamaRef.current) await llamaRef.current.release();
+      await releasePending.current;
+      if (!mounted.current || epoch !== modelEpoch.current) return;
       llamaRef.current = null;
       setModelReady(false);
+
+      await checkLoadCapacity(getModelPath(fileToLoad));
+      if (!mounted.current || epoch !== modelEpoch.current) return;
 
       const loaded = await initLlama({
         model: getModelPath(fileToLoad),
         use_mlock: false,
+        use_mmap: true,
+        n_batch: 128,
+        n_ubatch: 64,
         n_ctx: MODEL_CONTEXT_SIZE,
         n_gpu_layers: 0,
-        n_threads: 4,
+        n_threads: 2,
       });
       if (!mounted.current || epoch !== modelEpoch.current) {
         await loaded.release();
@@ -505,9 +558,9 @@ export function ChatScreen({ navigation, route }: Props) {
         },
       ]);
     }
-  };
+  });
 
-  const handleSendMessage = async (textOverride?: string) => {
+  const handleSendMessage = async (textOverride?: string, historyOverride?: Message[]) => {
     const rawInput = (
       textOverride !== undefined ? textOverride : inputText
     ).trim();
@@ -538,29 +591,42 @@ export function ChatScreen({ navigation, route }: Props) {
       : undefined;
 
     const aid = generateUniqueId().toString();
-    const newMessages = [...messages, userMsg];
+    const newMessages = [...(historyOverride ?? messages), userMsg];
     saveConversation(conversationId.current, newMessages);
     setMessages([...newMessages, { id: aid, role: 'assistant', content: '' }]);
-    setInputText('');
+    if (!historyOverride) setInputText('');
     setAttachedFile(null);
     setIsGenerating(true);
 
     let fullResponse = '';
+    const turnQuery = webEnabled ? rawInput.slice(0,400) : '';
+    let usedSources: WebSource[] = [];
     try {
+      let webSources: WebSource[] | undefined;
+      if (turnQuery) {
+        setSearching(true);
+        searchAbort.current = new AbortController();
+        webSources = await searchWeb(turnQuery, searchAbort.current.signal);
+        if (cancelRequested.current || !mounted.current) throw new Error('Search cancelled.');
+        setSearching(false);
+      }
       const formattedResult = await fitContext(
         context,
         {
           messages: newMessages,
-          systemPrompt: settings.systemPrompt,
-          memoryContextString: settings.memoryEnabled
+          systemPrompt: settings.systemPrompt + (settings.responseStyle === 'concise' ? '\nKeep answers brief and practical.' : settings.responseStyle === 'detailed' ? '\nGive thorough explanations with useful examples.' : ''),
+          memoryContextString: settings.memoryEnabled && !turnQuery
             ? getMemoryContextString()
             : '',
           currentAttachmentText,
           modelUrl: settings.modelUrl,
+          webSources,
         },
         MODEL_CONTEXT_SIZE,
-        settings.maxTokens,
+        turnQuery ? Math.min(settings.maxTokens,256) : settings.maxTokens,
       );
+      usedSources = formattedResult.webSources || [];
+      setMessages(prev => prev.map(m => m.id === aid ? {...m,sources:usedSources} : m));
       if (cancelRequested.current) {
         setMessages(newMessages);
         return;
@@ -600,7 +666,7 @@ export function ChatScreen({ navigation, route }: Props) {
         },
       );
 
-      if (!cancelRequested.current && settings.memoryEnabled) {
+      if (!cancelRequested.current && settings.memoryEnabled && !turnQuery) {
         const newMemories = parseMemoryActions(fullResponse);
         newMemories.forEach(m => addMemory(m));
       }
@@ -610,7 +676,7 @@ export function ChatScreen({ navigation, route }: Props) {
       const completedMessages: Message[] = savedResponse
         ? [
             ...newMessages,
-            { id: aid, role: 'assistant', content: savedResponse },
+            { id: aid, role: 'assistant', content: savedResponse, sources:usedSources },
           ]
         : newMessages;
       saveConversation(conversationId.current, completedMessages);
@@ -624,7 +690,7 @@ export function ChatScreen({ navigation, route }: Props) {
         const completedMessages: Message[] = savedResponse
           ? [
               ...newMessages,
-              { id: aid, role: 'assistant', content: savedResponse },
+              { id: aid, role: 'assistant', content: savedResponse, sources:usedSources },
             ]
           : newMessages;
         saveConversation(conversationId.current, completedMessages);
@@ -632,17 +698,20 @@ export function ChatScreen({ navigation, route }: Props) {
       } else {
         console.error(e);
         Alert.alert(
-          'Generation Error',
+          turnQuery ? 'Web answer unavailable' : 'Generation Error',
           e?.message || 'Failed to generate response.',
         );
+        saveConversation(conversationId.current, messages);
         setMessages(messages);
-        setInputText(rawInput);
+        if (!historyOverride) setInputText(rawInput);
         setAttachedFile(attachedFile);
       }
     } finally {
       generationBusy.current = false;
+      searchAbort.current = null;
       if (mounted.current) {
         setIsGenerating(false);
+        setSearching(false);
       }
     }
   };
@@ -650,6 +719,7 @@ export function ChatScreen({ navigation, route }: Props) {
   const stopGeneration = () => {
     if (llamaRef.current && isGenerating) {
       cancelRequested.current = true;
+      searchAbort.current?.abort();
       try {
         const stopRes = llamaRef.current.stopCompletion() as unknown;
         if (stopRes && typeof (stopRes as any).catch === 'function') {
@@ -667,6 +737,7 @@ export function ChatScreen({ navigation, route }: Props) {
     conversationId.current = generateUniqueId();
     setMessages([]);
     setContextNotice('');
+    setInputText(''); setAttachedFile(null);
   };
 
   const switchModel = (url: string) => {
@@ -695,63 +766,34 @@ export function ChatScreen({ navigation, route }: Props) {
   return (
     <View style={[ui.screen, { paddingTop: insets.top }]}>
       <View style={S.header}>
-        <IconButton
-          glyph="‹"
-          label="Back to conversations"
-          onPress={() => navigation.goBack()}
-        />
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Choose a model"
-          disabled={isGenerating || isDownloading}
-          style={S.modelPicker}
-          onPress={() => setShowModelModal(true)}
-        >
-          <Text style={S.headerTitle}>
-            Moonlight <Text style={S.chevron}>⌄</Text>
-          </Text>
-          <Text numberOfLines={1} style={S.status}>
-            {isAppBooting
-              ? 'Loading model…'
-              : modelReady
-              ? selected?.name || 'Custom model'
-              : 'Model setup needed'}
-          </Text>
-        </TouchableOpacity>
-        <IconButton
-          glyph="＋"
-          label="Start a new conversation"
-          disabled={isGenerating}
-          onPress={clearChat}
-        />
-        <IconButton
-          glyph="☷"
-          label="Open settings"
-          disabled={isGenerating}
-          onPress={() => navigation.navigate('Settings')}
-        />
+        <IconButton glyph="☰" label="Open menu" disabled={isGenerating || isDownloading} onPress={() => setDrawer(true)} />
+        <View style={[ui.row, ui.flex, {justifyContent: 'center'}]}><MoonMark size={28} /><Text style={S.headerTitle}>Moonlight</Text></View>
+        <IconButton glyph="＋" label="Start a new conversation" disabled={isGenerating || isDownloading} onPress={clearChat} />
       </View>
+      {modelReady && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Choose a model" disabled={isGenerating || isDownloading} onPress={() => setShowModelModal(true)} style={{alignSelf:'center', padding:12}}>
+        <Text style={ui.small}>{selected?.name || 'Custom model'} · On device  ⌄</Text>
+      </TouchableOpacity>}
       <KeyboardAvoidingView
         style={ui.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <FlatList
+          style={{flex:1,minHeight:0}}
           ref={listRef}
           data={messages}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={S.messages}
+          onLayout={() => listRef.current?.scrollToEnd({animated:false})}
           onContentSizeChange={() =>
             listRef.current?.scrollToEnd({ animated: false })
           }
           keyExtractor={item => item.id}
           ListEmptyComponent={
             <View style={S.welcome}>
-              <MoonMark size={52} />
-              <Text style={S.welcomeTitle}>What’s on your mind?</Text>
-              <Text style={S.welcomeBody}>
-                A question, a rough idea, a fresh start. Let’s work through it
-                together.
-              </Text>
+              <Text style={S.welcomeTitle}>A little clarity.{'\n'}A lot of possibility.</Text>
+              {modelReady && <Text style={S.welcomeBody}>
+                Big questions, half-formed ideas, everyday things.
+              </Text>}
               {isAppBooting ? (
                 <View style={S.loading}>
                   <ActivityIndicator color={C.accent} />
@@ -761,18 +803,19 @@ export function ChatScreen({ navigation, route }: Props) {
                 <View style={S.setup}>
                   <Text style={S.setupTitle}>
                     {isDownloading
-                      ? 'Bringing your AI on device'
-                      : 'Make this space yours'}
+                      ? 'Downloading your model'
+                      : 'Set up local chat'}
                   </Text>
                   <Text style={ui.body}>
                     {isDownloading
-                      ? 'Keep the app open while your model downloads.'
+                      ? 'Keep writing while it downloads. Keep the app open.'
                       : 'Download a model once, then chat with it offline. Your phone does the thinking.'}
                   </Text>
                   <Text style={S.modelName}>
                     {selected?.name || 'Your custom model'}
                     {selected ? ' · ' + selected.size : ''}
                   </Text>
+                  {selected?.id === recommendedId && <Text style={ui.small}>Suggested for your available device capacity</Text>}
                   {isDownloading && (
                     <View
                       accessibilityRole="progressbar"
@@ -810,7 +853,7 @@ export function ChatScreen({ navigation, route }: Props) {
                         ? 'Cancel download · ' +
                           Math.round(downloadProgress) +
                           '%'
-                        : 'Download model'}
+                        : selected?.id === 'moonlight-v7' ? 'Download Moonlight' : 'Download model'}
                     </Text>
                   </TouchableOpacity>
                   {!isDownloading && (
@@ -847,7 +890,7 @@ export function ChatScreen({ navigation, route }: Props) {
           renderItem={({ item, index }) =>
             item.role === 'user' ? (
               <View style={S.userRow}>
-                <Text selectable style={S.userText}>
+                <Text selectable style={[S.userText, appearance.largeText && {fontSize:20,lineHeight:30}]}>
                   {item.content}
                 </Text>
               </View>
@@ -863,8 +906,14 @@ export function ChatScreen({ navigation, route }: Props) {
                 {item.content ? (
                   <AnswerText content={item.content} />
                 ) : (
-                  <Text style={ui.small}>Thinking through your message…</Text>
+                  <Text style={ui.small}>{searching ? 'Searching the web…' : 'Thinking through your message…'}</Text>
                 )}
+                {!!item.sources?.length && <View style={{gap:8,marginTop:14}}>
+                  <Text style={ui.small}>Search sources · Excerpts may be incomplete</Text>
+                  {sanitizeSources(item.sources).map(source=><TouchableOpacity key={source.url} accessibilityRole="link" onPress={()=>Linking.openURL(source.url).catch(()=>Alert.alert('Unable to open source','Try again in your browser.'))} style={[ui.card,{padding:12}]}>
+                    <Text style={ui.body}>[{source.id}] {source.title}</Text><Text style={ui.small}>{new URL(source.url).hostname}</Text>
+                  </TouchableOpacity>)}
+                </View>}
                 {!!item.content && !isGenerating && (
                   <View style={S.answerActions}>
                     <TouchableOpacity
@@ -874,6 +923,13 @@ export function ChatScreen({ navigation, route }: Props) {
                     >
                       <Text style={S.actionText}>Copy</Text>
                     </TouchableOpacity>
+                    {index === messages.length - 1 && <TouchableOpacity accessibilityRole="button" style={S.action} disabled={!modelReady} onPress={() => {
+                      const previous = messages[index-1];
+                      if (previous?.role !== 'user') return;
+                      if (previous.content.startsWith('📄')) { Alert.alert('Attach the file again', 'File contents are not retained for retry. Attach it again to generate another answer.'); return; }
+                      if (attachedFile) { Alert.alert('Remove the attachment first', 'Retry uses the previous message. Your current draft is kept.'); return; }
+                      void handleSendMessage(previous.content, messages.slice(0,index-1));
+                    }}><Text style={S.actionText}>Retry</Text></TouchableOpacity>}
                     <TouchableOpacity
                       accessibilityRole="button"
                       style={S.action}
@@ -942,6 +998,7 @@ export function ChatScreen({ navigation, route }: Props) {
           </View>
         )}
         <View
+          onLayout={() => listRef.current?.scrollToEnd({animated:false})}
           style={[
             S.composer,
             { marginBottom: (isKeyboardVisible ? 0 : insets.bottom) + 8 },
@@ -954,7 +1011,7 @@ export function ChatScreen({ navigation, route }: Props) {
             multiline
             maxLength={12000}
             style={S.input}
-            placeholder="Ask anything, make something…"
+            placeholder="Ask Moonlight"
             placeholderTextColor={C.textMuted}
           />
           <View style={S.composerTools}>
@@ -964,19 +1021,18 @@ export function ChatScreen({ navigation, route }: Props) {
               disabled={isGenerating}
               onPress={handlePickFile}
             />
-            <TouchableOpacity
-              accessibilityRole="button"
-              style={S.memoryButton}
-              onPress={showMemories}
-            >
-              <Text style={ui.small}>
-                {settings.memoryEnabled ? 'Memory on' : 'Memory off'}
-              </Text>
+            <TouchableOpacity accessibilityRole="switch" accessibilityState={{checked:webEnabled}} accessibilityLabel="Web search" disabled={isGenerating} style={S.memoryButton} onPress={() => {
+              if (webEnabled) {setWebEnabled(false);return;}
+              if (!getSearchConnection().connected) {Alert.alert('Connect web search','Open Settings → Web search and enter the server address and access key supplied by your alpha administrator.',[{text:'Later',style:'cancel'},{text:'Open settings',onPress:()=>navigation.navigate('Settings')}]);return;}
+              setWebEnabled(true);
+            }}>
+              <Text style={[ui.small,webEnabled&&{color:C.accent,fontWeight:'600'}]}>{webEnabled ? '◎ Web on' : '◎ Web off'}</Text>
             </TouchableOpacity>
             <View style={ui.flex} />
             <IconButton
               glyph="≋"
-              label="Dictate message"
+              icon="microphone"
+              label="Speak and send message"
               disabled={voiceModeActive || isGenerating}
               onPress={startVoiceInput}
             />
@@ -1004,6 +1060,9 @@ export function ChatScreen({ navigation, route }: Props) {
           </View>
         </View>
       </KeyboardAvoidingView>
+      <ConversationDrawer visible={drawer} onDeleted={id => {if(id === conversationId.current) {conversationId.current = generateUniqueId(); setMessages([]);}}} onClose={() => setDrawer(false)} onNew={() => {clearChat(); setDrawer(false);}} onOpen={conversation => {
+        conversationId.current = conversation.id; setMessages(conversation.messages); setInputText(''); setAttachedFile(null); setDrawer(false);
+      }} onNavigate={name => {setDrawer(false); navigation.navigate(name);}} />
       <ReportResponseModal
         message={reportedMessage}
         onClose={() => setReportedMessage(null)}
@@ -1025,10 +1084,10 @@ export function ChatScreen({ navigation, route }: Props) {
               />
             </View>
             <Text style={ui.body}>
-              Models run locally after download. Larger models need more memory.
+              {recommendation || 'Models run locally after download. Larger models need more memory.'}
             </Text>
             <ScrollView>
-              {AVAILABLE_MODELS.map(model => (
+              {[...AVAILABLE_MODELS].sort((a,b) => Number(b.id === recommendedId) - Number(a.id === recommendedId)).map(model => (
                 <TouchableOpacity
                   accessibilityRole="radio"
                   accessibilityState={{
@@ -1041,7 +1100,7 @@ export function ChatScreen({ navigation, route }: Props) {
                   <View style={ui.flex}>
                     <Text style={S.modelName}>{model.name}</Text>
                     <Text style={ui.small}>
-                      {model.provider} · {model.size}
+                      {model.provider} · {model.size}{model.id === recommendedId ? ' · Suggested' : ''}
                     </Text>
                   </View>
                   <Text style={S.link}>
@@ -1066,7 +1125,7 @@ export function ChatScreen({ navigation, route }: Props) {
     </View>
   );
 }
-const S = StyleSheet.create({
+const S = themedStyles(() => ({
   reportOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.70)',
@@ -1159,7 +1218,7 @@ const S = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    minHeight: 72,
+    minHeight: 56,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
@@ -1168,8 +1227,9 @@ const S = StyleSheet.create({
   chevron: { color: C.textMuted },
   status: { color: C.textMuted, fontSize: 11, marginTop: 4 },
   messages: { padding: 22, paddingBottom: 30, flexGrow: 1 },
-  welcome: { alignItems: 'center', paddingTop: 42, gap: 20 },
+  welcome: { alignItems: 'center', paddingTop: 8, gap: 12 },
   welcomeTitle: {
+    fontFamily: Theme.headingFont,
     fontSize: 29,
     fontWeight: '500',
     letterSpacing: -1,
@@ -1186,12 +1246,12 @@ const S = StyleSheet.create({
   setup: {
     alignSelf: 'stretch',
     marginTop: 10,
-    padding: 22,
-    borderRadius: 24,
+    padding: 18,
+    borderRadius: 16,
     backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: C.border,
-    gap: 16,
+    gap: 10,
   },
   setupTitle: { color: C.textPrimary, fontSize: 20, fontWeight: '600' },
   modelName: { color: C.textPrimary, fontSize: 14, fontWeight: '600' },
@@ -1247,18 +1307,19 @@ const S = StyleSheet.create({
   },
   actionText: { color: C.textSecondary, fontSize: 12 },
   composer: {
+    flexShrink: 0,
     backgroundColor: C.surface,
     borderWidth: 1,
     borderColor: C.border,
     marginHorizontal: 14,
-    borderRadius: 26,
+    borderRadius: 18,
     padding: 8,
   },
   input: {
     color: C.textPrimary,
     fontSize: 16,
     lineHeight: 24,
-    minHeight: 54,
+    minHeight: 44,
     maxHeight: 160,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -1269,7 +1330,7 @@ const S = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Theme.color.primary,
+    get backgroundColor() { return Theme.color.primary; },
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 4,
@@ -1311,4 +1372,4 @@ const S = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-});
+}));
