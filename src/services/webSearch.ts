@@ -4,6 +4,7 @@ import {NativeModules} from 'react-native';
 export interface WebSource {id: number; title: string; url: string; snippet: string}
 let accessCode = '';
 let requestNumber = 0;
+let connectionRevision = 0;
 const ENDPOINT_KEY = 'search_endpoint';
 export const DEFAULT_SEARCH_ENDPOINT = 'https://search.bodhisync.online/search';
 
@@ -26,10 +27,36 @@ export function saveSearchConnection(endpoint: string, code: string) {
   const valid = safeWebUrl(endpoint.trim());
   if (!valid || new URL(valid).search || new URL(valid).hash) throw new Error('Enter the HTTPS search address supplied by your alpha administrator, without query parameters.');
   if (!/^[a-zA-Z0-9_-]{32,128}$/.test(code.trim())) throw new Error('Enter your alpha search access code.');
-  storage.set(ENDPOINT_KEY, valid);
-  accessCode = code.trim(); // Session only: never persist a bearer credential in unencrypted MMKV.
+  const revision = ++connectionRevision;
+  const commit = () => {
+    if (revision !== connectionRevision) return;
+    storage.set(ENDPOINT_KEY, valid);
+    accessCode = code.trim();
+  };
+  if (NativeModules.DeviceControl?.saveSearchCredentials) {
+    return NativeModules.DeviceControl.saveSearchCredentials(JSON.stringify({endpoint:valid,code:code.trim()})).then(commit);
+  }
+  commit(); // Development environments without the native store remain session-only.
 }
-export function disconnectSearch() {accessCode = ''; storage.remove(ENDPOINT_KEY);}
+export function disconnectSearch() {
+  connectionRevision++;
+  accessCode = ''; storage.remove(ENDPOINT_KEY);
+  return NativeModules.DeviceControl?.clearSearchCredentials?.();
+}
+
+export async function restoreSearchConnection() {
+  if (accessCode || !NativeModules.DeviceControl?.readSearchCredentials) return getSearchConnection();
+  const revision = connectionRevision;
+  const raw = await NativeModules.DeviceControl.readSearchCredentials();
+  if (revision !== connectionRevision || !raw) return getSearchConnection();
+  const saved = JSON.parse(raw);
+  const valid = safeWebUrl(saved.endpoint);
+  if (!valid || new URL(valid).search || new URL(valid).hash || !/^[a-zA-Z0-9_-]{32,128}$/.test(saved.code)) {
+    throw new Error('Saved search access is invalid. Re-enter the address and key in Settings → Web search.');
+  }
+  storage.set(ENDPOINT_KEY,valid); accessCode=saved.code;
+  return getSearchConnection();
+}
 
 const plain = (v: unknown, length: number) => typeof v === 'string'
   ? v.replace(/<[^>]*>/g, ' ').replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, length) : '';
@@ -51,7 +78,7 @@ export function sanitizeSources(value: unknown): WebSource[] {
 }
 
 export async function searchWeb(query: string, signal?: AbortSignal): Promise<WebSource[]> {
-  const {endpoint, connected} = getSearchConnection();
+  const {endpoint, connected} = await restoreSearchConnection();
   if (!connected) throw new Error('Web search is not activated. Connect in Settings → Web search using your alpha server address and access key.');
   const q = query.trim();
   if (!q || q.length > 400) throw new Error('Use a search query between 1 and 400 characters.');
@@ -66,7 +93,7 @@ export async function searchWeb(query: string, signal?: AbortSignal): Promise<We
     if (!NativeModules.DeviceControl?.requestWebSearch) throw new Error('Web search requires the updated Android build.');
     const response = await NativeModules.DeviceControl.requestWebSearch(requestId, endpoint, accessCode, q);
     if (controller.signal.aborted) throw new Error('Search cancelled.');
-    if (response.status === 401) {disconnectSearch(); throw new Error('Search access has expired or is unavailable. You can continue chatting with Web off.');}
+    if (response.status === 401) {await disconnectSearch(); throw new Error('Search access has expired or was rejected by the server. Re-enter a valid key in Settings → Web search.');}
     if (response.status === 429) throw new Error('Search is busy or your daily allowance is used. Try later or send with Web off.');
     if (response.status !== 200) throw new Error('Search service is unavailable. Try later or send with Web off.');
     const raw = response.body;

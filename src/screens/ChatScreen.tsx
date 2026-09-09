@@ -37,7 +37,7 @@ import {
 } from '../services/modelManager';
 import { initLlama, LlamaContext } from 'llama.rn';
 import {checkLoadCapacity, serializeModelLoad} from '../services/modelLoadGuard';
-import {getSearchConnection, searchWeb, sanitizeSources, WebSource} from '../services/webSearch';
+import {getSearchConnection, restoreSearchConnection, searchWeb, sanitizeSources, WebSource} from '../services/webSearch';
 import {
   getMemoryContextString,
   addMemory,
@@ -1021,9 +1021,10 @@ export function ChatScreen({ navigation, route }: Props) {
               disabled={isGenerating}
               onPress={handlePickFile}
             />
-            <TouchableOpacity accessibilityRole="switch" accessibilityState={{checked:webEnabled}} accessibilityLabel="Web search" disabled={isGenerating} style={S.memoryButton} onPress={() => {
+            <TouchableOpacity accessibilityRole="switch" accessibilityState={{checked:webEnabled}} accessibilityLabel="Web search" disabled={isGenerating} style={S.memoryButton} onPress={async () => {
               if (webEnabled) {setWebEnabled(false);return;}
-              if (!getSearchConnection().connected) {Alert.alert('Connect web search','Open Settings → Web search and enter the server address and access key supplied by your alpha administrator.',[{text:'Later',style:'cancel'},{text:'Open settings',onPress:()=>navigation.navigate('Settings')}]);return;}
+              try {await restoreSearchConnection();} catch(error:any) {Alert.alert('Search connection',error.message);return;}
+              if (!getSearchConnection().connected) {Alert.alert('Connect web search','Open Settings → Web search and save the server address and access key supplied by your alpha administrator.',[{text:'Later',style:'cancel'},{text:'Open settings',onPress:()=>navigation.navigate('Settings')}]);return;}
               setWebEnabled(true);
             }}>
               <Text style={[ui.small,webEnabled&&{color:C.accent,fontWeight:'600'}]}>{webEnabled ? '◎ Web on' : '◎ Web off'}</Text>

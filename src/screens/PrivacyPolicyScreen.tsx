@@ -75,7 +75,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           policy.
         </Text>
         <Text style={styles.heading}>Documents and speech</Text>
-        <Text style={styles.body}>When Web is on, Moonlight automatically sends the first 400 characters of each new typed or spoken message to the configured search backend and its upstream search engines. Web stays on until disabled or the app restarts. Saved history, memories and attachments are not uploaded. The alpha backend stores access-code hashes and daily request counts, not queries or results. Infrastructure providers may retain network metadata. Source links and excerpts are saved with the conversation; opening a source contacts that site. The access code is kept only in app-session memory.</Text>
+        <Text style={styles.body}>When Web is on, Moonlight automatically sends the first 400 characters of each new typed or spoken message to the configured search backend and its upstream search engines. Web stays on until disabled or the app restarts. Saved history, memories and attachments are not uploaded. The alpha backend stores access-code hashes and daily request counts, not queries or results. Infrastructure providers may retain network metadata. Source links and excerpts are saved with the conversation; opening a source contacts that site. The access key is encrypted on this phone using Android Keystore and restored after restarting. Disconnect in Web search settings removes it. App backup is disabled.</Text>
         <Text style={styles.body}>
           The Android system document picker grants access only to a document
           you select. Supported text is read into the current local chat. Voice

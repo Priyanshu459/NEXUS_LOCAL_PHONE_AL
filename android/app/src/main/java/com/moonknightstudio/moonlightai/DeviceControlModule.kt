@@ -37,6 +37,30 @@ class DeviceControlModule(
   }
 
   private var speechPromise: Promise? = null
+  private val searchCredentials = SearchCredentialStore(appContext)
+  private val credentialExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+  @ReactMethod
+  fun saveSearchCredentials(value: String, promise: Promise) {
+    credentialExecutor.execute {
+      try { searchCredentials.save(value); promise.resolve(true) }
+      catch (_: Exception) { promise.reject("SEARCH_STORAGE", "Could not securely save search access. Try again.") }
+    }
+  }
+  @ReactMethod
+  fun readSearchCredentials(promise: Promise) {
+    credentialExecutor.execute {
+      try { promise.resolve(searchCredentials.read()) }
+      catch (_: Exception) { promise.reject("SEARCH_STORAGE", "Saved search access could not be unlocked. Re-enter your key in Settings.") }
+    }
+  }
+  @ReactMethod
+  fun clearSearchCredentials(promise: Promise) {
+    credentialExecutor.execute {
+      try { searchCredentials.clear(); promise.resolve(true) }
+      catch (_: Exception) { promise.reject("SEARCH_STORAGE", "Could not remove saved search access. Try again.") }
+    }
+  }
   private var filePromise: Promise? = null
   private data class SearchRequest(val connection: HttpsURLConnection, val cancelled: AtomicBoolean = AtomicBoolean(false))
   private val searches = ConcurrentHashMap<String, SearchRequest>()

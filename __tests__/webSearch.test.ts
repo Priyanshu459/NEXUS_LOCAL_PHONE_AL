@@ -1,7 +1,8 @@
 import {NativeModules} from 'react-native';
 import {storage} from '../src/services/storage';
-import {DEFAULT_SEARCH_ENDPOINT,disconnectSearch,getSearchConnection,saveSearchConnection,searchWeb,sanitizeSources,safeWebUrl} from '../src/services/webSearch';
+import {DEFAULT_SEARCH_ENDPOINT,disconnectSearch,getSearchConnection,restoreSearchConnection,saveSearchConnection,searchWeb,sanitizeSources,safeWebUrl} from '../src/services/webSearch';
 const code='a'.repeat(43);
+afterEach(()=>{delete NativeModules.DeviceControl.readSearchCredentials;delete NativeModules.DeviceControl.saveSearchCredentials;delete NativeModules.DeviceControl.clearSearchCredentials;});
 beforeEach(()=>{storage.clearAll();disconnectSearch();NativeModules.DeviceControl.requestWebSearch=jest.fn();NativeModules.DeviceControl.cancelWebSearch=jest.fn();});
 test('configuration requires HTTPS and keeps the access code out of persisted settings',()=>{
   expect(()=>saveSearchConnection('http://example.com/search',code)).toThrow();
@@ -10,6 +11,29 @@ test('configuration requires HTTPS and keeps the access code out of persisted se
   expect(storage.getString('search_endpoint')).toBe('https://example.com/search');
   expect(storage.getString('app_settings')).toBeUndefined();
   disconnectSearch();expect(getSearchConnection().connected).toBe(false);
+});
+
+test('restores endpoint and key from encrypted native storage before sending',async()=>{
+  NativeModules.DeviceControl.readSearchCredentials=jest.fn(async()=>JSON.stringify({endpoint:DEFAULT_SEARCH_ENDPOINT,code}));
+  NativeModules.DeviceControl.requestWebSearch.mockResolvedValue({status:200,body:JSON.stringify({sources:[{title:'Page',url:'https://example.org/a',snippet:'Evidence'}]})});
+  await searchWeb('restored query');
+  expect(NativeModules.DeviceControl.requestWebSearch).toHaveBeenCalledWith(expect.any(String),DEFAULT_SEARCH_ENDPOINT,code,'restored query');
+});
+
+test('failed secure saving cannot claim a new connection',async()=>{
+  NativeModules.DeviceControl.saveSearchCredentials=jest.fn(async()=>{throw new Error('storage unavailable');});
+  await expect(saveSearchConnection(DEFAULT_SEARCH_ENDPOINT,code)).rejects.toThrow('storage unavailable');
+  expect(getSearchConnection().connected).toBe(false);
+});
+
+test('disconnect cannot be undone by a pending restore',async()=>{
+  let finish!:(value:string)=>void;
+  NativeModules.DeviceControl.readSearchCredentials=jest.fn(()=>new Promise(resolve=>{finish=resolve;}));
+  const restoring=restoreSearchConnection();
+  disconnectSearch();
+  finish(JSON.stringify({endpoint:DEFAULT_SEARCH_ENDPOINT,code}));
+  await restoring;
+  expect(getSearchConnection().connected).toBe(false);
 });
 test('unconfigured search sends nothing',async()=>{
   expect(getSearchConnection()).toEqual({endpoint:DEFAULT_SEARCH_ENDPOINT,connected:false});

@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Alert, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Theme, useAppearance, setAppearance, appearanceChoices} from '../constants/theme';
@@ -7,7 +7,7 @@ import {AppSettings, defaultSettings, getSettings, saveSettings} from '../servic
 import {deleteMemory, getMemories, memoryStorage} from '../services/MemoryManager';
 import {validateGgufDownloadUrl} from '../services/modelManager';
 import {clearConversations} from '../services/conversations';
-import {getSearchConnection, saveSearchConnection, disconnectSearch} from '../services/webSearch';
+import {getSearchConnection, restoreSearchConnection, saveSearchConnection, disconnectSearch} from '../services/webSearch';
 
 const sections = [
   ['Appearance','Theme & reading size'], ['Responses','Style & personal instructions'],
@@ -24,6 +24,8 @@ export function SettingsScreen({navigation}: any) {
   const [searchEndpoint,setSearchEndpoint]=useState(()=>getSearchConnection().endpoint);
   const [searchCode,setSearchCode]=useState('');
   const [searchConnected,setSearchConnected]=useState(()=>getSearchConnection().connected);
+  const [savingSearch,setSavingSearch]=useState(false);
+  useEffect(()=>{let active=true;restoreSearchConnection().then(connection=>{if(active){setSearchConnected(connection.connected);setSearchEndpoint(connection.endpoint);}}).catch(error=>{if(active)setStatus(error.message);});return()=>{active=false;};},[]);
   const update=(patch:Partial<AppSettings>)=>{saveSettings({...getSettings(),...patch});setSettings(getSettings());};
   const open=(name:string)=>{
     setStatus('');
@@ -78,12 +80,12 @@ export function SettingsScreen({navigation}: any) {
         <Text style={ui.section}>Connection details</Text>
         <Text style={ui.small}>Search address</Text><TextInput accessibilityLabel="Search service address" autoCapitalize="none" autoCorrect={false} value={searchEndpoint} onChangeText={setSearchEndpoint} style={ui.input}/>
         <Text style={ui.small}>Your private access key</Text><TextInput accessibilityLabel="Alpha search access code" secureTextEntry autoCapitalize="none" autoCorrect={false} value={searchCode} onChangeText={setSearchCode} style={ui.input}/>
-        {button('Save search connection',()=>{try{saveSearchConnection(searchEndpoint,searchCode);setSearchCode('');setSearchConnected(true);setStatus('Saved. Enable Web in chat when needed. Server connection is not yet verified.');}catch(error:any){setStatus(error.message);}})}
-        {searchConnected&&row('Disconnect search','Remove this session’s access code',()=>{disconnectSearch();setSearchConnected(false);setSearchEndpoint('');setStatus('Search disconnected.');})}
+        {button(savingSearch?'Saving securely…':'Save search connection',async()=>{if(savingSearch)return;setSavingSearch(true);try{await saveSearchConnection(searchEndpoint,searchCode);setSearchCode('');setSearchConnected(true);setStatus('Saved securely on this phone. Enable Web in chat. Server access will be checked on your next search.');}catch(error:any){setStatus(error.message);}finally{setSavingSearch(false);}})}
+        {searchConnected&&row('Disconnect search','Remove the saved access key from this phone',async()=>{try{await disconnectSearch();setSearchConnected(false);setSearchEndpoint('');setStatus('Search disconnected.');}catch(error:any){setStatus(error.message);}})}
         <View style={ui.card}><Text style={[ui.section,{marginTop:0}]}>Ask naturally</Text><Text style={ui.body}>1. Return to chat and turn Web on.</Text><Text style={ui.body}>2. Type or speak your question.</Text><Text style={ui.body}>3. Moonlight searches automatically and uses the results to answer with source links.</Text></View>
         <Text style={ui.section}>Your conversation stays local</Text>
         <Text style={ui.body}>While Web is on, the first 400 characters of each new message are sent to the configured server and its search engines. This includes spoken messages. Saved history, memories and attachments are not uploaded. Web stays on until you turn it off or restart the app.</Text>
-        <Text style={ui.small}>Your code stays in memory for this app session only; enter it again after restarting. Up to 20 search attempts per tester per UTC day. Busy or failed searches may require retrying.</Text>
+        <Text style={ui.small}>Your key is encrypted on this phone using Android Keystore and restored after restarting. Disconnect removes it. Up to 20 search attempts per tester per UTC day. Busy or failed searches may require retrying.</Text>
       </>}
       {panel==='Privacy'&&<>
         <Text style={[ui.title,{fontSize:29}]}>Know where data goes.</Text>
@@ -103,7 +105,7 @@ export function SettingsScreen({navigation}: any) {
           {key:'maxTokens',label:'Response token limit',help:'Maximum new tokens per answer.',step:128,min:64,max:2048}] as const).map(item=><View key={item.key} style={ui.row}><View style={ui.flex}><Text style={ui.body}>{item.label}</Text><Text style={ui.small}>{item.help}</Text></View><IconButton glyph="−" label={`Decrease ${item.label}`} onPress={()=>update({[item.key]:Math.max(item.min,Number((settings[item.key]-item.step).toFixed(2)))})}/><Text style={ui.body}>{settings[item.key]}</Text><IconButton glyph="＋" label={`Increase ${item.label}`} onPress={()=>update({[item.key]:Math.min(item.max,Number((settings[item.key]+item.step).toFixed(2)))})}/></View>)}
       </>}
       {panel==='About & help'&&<>
-        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.3.3 · Closed alpha</Text>
+        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.3.4 · Closed alpha</Text>
         {row('Model licenses & attribution','',()=>navigation.navigate('ModelAttribution'))}
         {row('Privacy policy','',()=>navigation.navigate('PrivacyPolicy'))}
         <Text style={ui.section}>Download failed?</Text><Text style={ui.body}>Check your connection and available storage, then retry. Keep the app open during large downloads.</Text>

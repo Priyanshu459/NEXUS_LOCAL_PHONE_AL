@@ -43,7 +43,7 @@ try {
     } finally { Pop-Location }
     $outputDir = Join-Path $projectRoot 'releases'
     New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-    $apkPath = Join-Path $outputDir 'Moonlight-1.3.3-Preview-arm64.apk'
+    $apkPath = Join-Path $outputDir 'Moonlight-1.3.4-Preview-arm64.apk'
     Copy-Item -LiteralPath (Join-Path $projectRoot 'android\app\build\outputs\apk\release\app-release.apk') -Destination $apkPath
     & "$env:ANDROID_HOME\build-tools\36.0.0\apksigner.bat" verify --verbose $apkPath
     if ($LASTEXITCODE -ne 0) { throw 'APK signature verification failed.' }

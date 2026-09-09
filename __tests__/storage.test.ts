@@ -1,6 +1,10 @@
 import { CHAT_HISTORY_KEY, defaultSettings, getSettings, parseJsonOrDefault, saveSettings, storage } from '../src/services/storage';
 
 describe('storage service', () => {
+  it('repairs the obsolete Llama revision in saved settings', () => {
+    storage.set('app_settings',JSON.stringify({...defaultSettings,modelUrl:'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/e1d3e8e/Llama-3.2-1B-Instruct-Q4_K_M.gguf'}));
+    expect(getSettings().modelUrl).toContain('/resolve/067b946cf014b7c697f3654f621d577a3e3afd1c/');
+  });
   beforeEach(() => {
     storage.clearAll();
   });

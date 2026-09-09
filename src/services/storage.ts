@@ -1,4 +1,5 @@
 import { createMMKV } from 'react-native-mmkv';
+import {MODEL_CATALOG} from '../constants/models';
 
 export const storage = createMMKV({
   id: 'moon-studio-storage',
@@ -64,7 +65,8 @@ const sanitizeSettings = (value: unknown): AppSettings => {
     top_k: clamp(value.top_k, 1, 100, defaultSettings.top_k),
     maxTokens: clamp(value.maxTokens, 64, 8192, defaultSettings.maxTokens),
     modelUrl: typeof value.modelUrl === 'string' && value.modelUrl.trim()
-      ? value.modelUrl
+      ? value.modelUrl === 'https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/e1d3e8e/Llama-3.2-1B-Instruct-Q4_K_M.gguf'
+        ? MODEL_CATALOG.find(model=>model.id==='llama32-1b')!.url : value.modelUrl
       : defaultSettings.modelUrl,
     memoryEnabled: typeof value.memoryEnabled === 'boolean'
       ? value.memoryEnabled
