@@ -17,7 +17,7 @@ test('saves each design and keeps reading preference', () => {
   expect(Theme.headingFont).toBe('sans-serif');
 });
 
-test.each([['light','paper'], ['dark','midnight'], ['invalid','paper']])('migrates legacy or unknown preference %s', (saved, expected) => {
+test.each([['light','paper'], ['dark','midnight'], ['invalid','glass']])('migrates legacy or unknown preference %s', (saved, expected) => {
   storage.set('appearance_mode', saved);
   expect(getAppearance().mode).toBe(expected);
 });

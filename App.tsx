@@ -7,12 +7,15 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ChatScreen } from './src/screens/ChatScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import {ProvidersScreen} from './src/screens/ProvidersScreen';
 import { GalleryScreen } from './src/screens/GalleryScreen';
 import { WorkspaceScreen } from './src/screens/WorkspaceScreen';
 import { ModelsScreen } from './src/screens/ModelsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 import { ModelAttributionScreen } from './src/screens/ModelAttributionScreen';
 import MoonlightSplash from './src/components/MoonlightSplash';
+import {AppUpdateNotice} from './src/components/AppUpdateNotice';
+import {LMStudioScreen} from './src/screens/LMStudioScreen';
 
 
 export type RootStackParamList = {
@@ -21,6 +24,8 @@ export type RootStackParamList = {
   Models: undefined;
   Chat: { initialPrompt?: string; conversationId?: string; newConversation?: boolean; openHistory?: boolean } | undefined;
   Settings: undefined;
+  Providers: undefined;
+  LMStudio: undefined;
   PrivacyPolicy: undefined;
   ModelAttribution: undefined;
 };
@@ -51,6 +56,7 @@ function App(): React.JSX.Element {
         translucent
         backgroundColor="transparent"
       />
+      <AppUpdateNotice />
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName="Chat"
@@ -67,6 +73,8 @@ function App(): React.JSX.Element {
           <Stack.Screen name="Models" component={ModelsScreen} />
           <Stack.Screen name="Chat" component={ChatScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Providers" component={ProvidersScreen}/>
+          <Stack.Screen name="LMStudio" component={LMStudioScreen}/>
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
           <Stack.Screen name="ModelAttribution" component={ModelAttributionScreen} />
         </Stack.Navigator>

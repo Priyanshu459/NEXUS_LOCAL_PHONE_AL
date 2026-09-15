@@ -13,6 +13,9 @@ import { DOCK_RESERVED_SPACE } from '../constants/layout';
 import { PageIntro, IconButton } from '../components/Design';
 import {getDeviceRecommendation} from '../services/deviceRecommendation';
 import { Theme, themedStyles, useAppearance } from '../constants/theme';
+import {GlassBackdrop} from '../components/GlassBackdrop';
+import {ModelMetadata} from '../constants/models';
+import {selectCloud} from '../services/providers';
 import { getSettings, saveSettings } from '../services/storage';
 import {
   cancelDownload,
@@ -35,7 +38,10 @@ export function ModelsScreen({ navigation }: any) {
   const [loadError, setLoadError] = useState(false);
   const [suggested, setSuggested] = useState('');
   const [capacityNote, setCapacityNote] = useState('');
-  useEffect(()=>{let active=true;getDeviceRecommendation().then(r=>{if(active){setSuggested(r.model.id);setCapacityNote(r.reason);}});return()=>{active=false;};},[]);
+  const [eligible,setEligible]=useState<ModelMetadata[]>([]);
+  const [freeStorage,setFreeStorage]=useState<number|null>(null);
+  const refreshCapacity=async()=>{const r=await getDeviceRecommendation();setSuggested(r.model.id);setCapacityNote(r.reason);setEligible(r.models);setFreeStorage(Number.isFinite(r.capacity?.freeStorage)?r.capacity!.freeStorage:null);};
+  useEffect(()=>{void refreshCapacity();},[]);
 
   const refreshInstallations = useCallback(async () => {
     setChecking(true);
@@ -71,6 +77,7 @@ export function ModelsScreen({ navigation }: any) {
 
   const setActive = (url: string) => {
     if (!installed[url]) return;
+    selectCloud(null);
     const next = { ...getSettings(), modelUrl: url };
     saveSettings(next);
     setSettings(next);
@@ -81,15 +88,15 @@ export function ModelsScreen({ navigation }: any) {
     setDownloadingUrl(url);
     setDownloadProgress(0);
     try {
+      const live=await getDeviceRecommendation();
+      if(!live.models.some(m=>m.url===url))throw new Error('This model does not fit the current memory check. Close other apps and check again.');
       await downloadModel(
         url,
         getModelFilenameFromUrl(url),
         setDownloadProgress,
       );
       setInstalled(previous => ({ ...previous, [url]: true }));
-      const next = { ...getSettings(), modelUrl: url };
-      saveSettings(next);
-      setSettings(next);
+      // Keep the current model until the user explicitly chooses the completed download.
     } catch (error: any) {
       if (!String(error?.message).toLowerCase().includes('cancel')) {
         Alert.alert(
@@ -108,7 +115,7 @@ export function ModelsScreen({ navigation }: any) {
     model => model.url === settings.modelUrl,
   )
     ? null
-    : settings.modelUrl;
+    : installed[settings.modelUrl] ? settings.modelUrl : null;
 
   const stopDownload = () => {
     cancelDownload();
@@ -150,8 +157,9 @@ export function ModelsScreen({ navigation }: any) {
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <GlassBackdrop/>
       <AppHeader
-        title="Your models"
+        title="Models & storage"
         subtitle="A little intelligence, kept close"
         trailing={<IconButton glyph="‹" label="Back to chat" disabled={!!downloadingUrl} onPress={() => navigation.goBack()} />}
       />
@@ -163,8 +171,8 @@ export function ModelsScreen({ navigation }: any) {
         showsVerticalScrollIndicator={false}
       >
         <PageIntro
-          eyebrow="INTELLIGENCE, ON DEVICE"
-          title="Find the right fit."
+          eyebrow="LIQUID AI · ON THIS PHONE"
+          title="Small models. More possibility."
           body={capacityNote || 'Choose a model for your phone. Larger models need more available memory.'}
         />
         {loadError && (
@@ -179,7 +187,10 @@ export function ModelsScreen({ navigation }: any) {
             <Text style={styles.noticeText}>Tap to try again.</Text>
           </TouchableOpacity>
         )}
-        {[...AVAILABLE_MODELS].sort((a,b)=>Number(b.id===suggested)-Number(a.id===suggested)).map(model => {
+        <TouchableOpacity accessibilityRole="button" onPress={()=>void refreshCapacity()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Check available memory again</Text></TouchableOpacity>
+        {freeStorage!==null&&<View style={styles.card}><Text style={styles.modelName}>{(freeStorage/1024**3).toFixed(1)} GB available</Text><Text style={styles.description}>Phone storage · Download sizes below are verified file sizes. Running a model also needs working memory.</Text></View>}
+        {!eligible.length&&<Text style={styles.description}>No LFM model fits the current memory check. Close other apps or connect LM Studio or a cloud provider.</Text>}
+        {[...AVAILABLE_MODELS].filter(m=>eligible.some(e=>e.id===m.id)||installed[m.url]||downloadingUrl===m.url).sort((a,b)=>Number(b.id===suggested)-Number(a.id===suggested)).map(model => {
           const isActive = settings.modelUrl === model.url;
           const isInstalled = !!installed[model.url];
           const isDownloading = downloadingUrl === model.url;
@@ -267,7 +278,7 @@ export function ModelsScreen({ navigation }: any) {
                     }
                     disabled={
                       checking ||
-                      loadError ||
+                      loadError || (!eligible.some(m=>m.id===model.id)&&!isDownloading) ||
                       (!!downloadingUrl && !isDownloading)
                     }
                     accessibilityRole="button"
@@ -335,7 +346,7 @@ export function ModelsScreen({ navigation }: any) {
             <Text style={styles.description} numberOfLines={3}>
               {customModelUrl}
             </Text>
-            {downloadingUrl === customModelUrl ? (
+              {downloadingUrl === customModelUrl ? (
               <View style={styles.progressTrack}>
                 <View
                   style={[
@@ -372,14 +383,13 @@ export function ModelsScreen({ navigation }: any) {
 
         <TouchableOpacity
           style={styles.customButton}
-          onPress={() => navigation.navigate('Settings')}
+          onPress={() => navigation.navigate('LMStudio')}
           accessibilityRole="button"
           activeOpacity={0.7}
         >
-          <Text style={styles.customTitle}>Add model from Hugging Face</Text>
+          <Text style={styles.customTitle}>Connect LM Studio</Text>
           <Text style={styles.customDescription}>
-            Paste a repository or direct .gguf link in Settings. Repository,
-            /blob/, and /resolve/ links work.
+            Use models from your computer and its LM Link through the server API.
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -492,7 +502,7 @@ const styles = themedStyles(() => ({
     justifyContent: 'center',
   },
   primaryButtonText: {
-    color: Theme.color.background,
+    color: Theme.onPrimary,
     fontSize: 13,
     fontWeight: '800',
   },

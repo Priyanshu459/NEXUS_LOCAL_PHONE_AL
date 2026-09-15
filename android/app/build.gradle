@@ -90,13 +90,15 @@ android {
         applicationId "com.moonknightstudio.moonlightai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10
-        versionName "1.3.4"
+        versionCode 17
+        versionName "1.6.1"
         if (project.hasProperty('moonlightPreview')) {
             applicationIdSuffix ".preview"
             versionNameSuffix "-preview"
         }
-        manifestPlaceholders = [usesCleartextTraffic: "false"]
+        // Needed only for explicitly opted-in LM Studio private-IP HTTP.
+        // ProviderClient enforces that boundary; all cloud APIs remain HTTPS-only.
+        manifestPlaceholders = [usesCleartextTraffic: "true"]
     }
     signingConfigs {
         debug {
@@ -145,6 +147,8 @@ gradle.taskGraph.whenReady { graph ->
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    implementation("com.google.android.play:app-update:2.1.0")
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
@@ -154,3 +158,6 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+
+

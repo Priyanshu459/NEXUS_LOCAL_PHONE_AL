@@ -1,18 +1,22 @@
 import React, {useEffect, useState} from 'react';
-import {Alert, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Alert, Image, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Theme, useAppearance, setAppearance, appearanceChoices} from '../constants/theme';
+import {Theme, useAppearance, setAppearance, appearanceChoices,reducedTransparency,setReducedTransparency,reducedMotion,setReducedMotion} from '../constants/theme';
+import {GlassBackdrop} from '../components/GlassBackdrop';
 import {IconButton, ui} from '../components/Design';
 import {AppSettings, defaultSettings, getSettings, saveSettings} from '../services/storage';
 import {deleteMemory, getMemories, memoryStorage} from '../services/MemoryManager';
 import {validateGgufDownloadUrl} from '../services/modelManager';
 import {clearConversations} from '../services/conversations';
-import {getSearchConnection, restoreSearchConnection, saveSearchConnection, disconnectSearch} from '../services/webSearch';
+import {MoonMark} from '../components/Design';
+import {SettingsIcon} from '../components/SettingsIcon';
 
 const sections = [
+  ['AI providers','Your API keys & cloud models'],
   ['Appearance','Theme & reading size'], ['Responses','Style & personal instructions'],
   ['Memory','View, enable or delete'], ['Models & storage','Downloads & active model'],
-  ['Conversations','Export & delete'], ['Web search','Alpha connection & privacy'],
+  ['LM Studio','Connect your computer & linked models'],
+  ['Conversations','Export & delete'],
   ['Privacy','Understand local processing'], ['Advanced','Model URL & generation controls'],
   ['About & help','Licenses & troubleshooting'],
 ];
@@ -21,42 +25,46 @@ export function SettingsScreen({navigation}: any) {
   const [panel,setPanel]=useState(''); const [settings,setSettings]=useState(getSettings);
   const [prompt,setPrompt]=useState(settings.systemPrompt); const [url,setUrl]=useState(settings.modelUrl);
   const [status,setStatus]=useState(''); const [memories,setMemories]=useState(getMemories);
-  const [searchEndpoint,setSearchEndpoint]=useState(()=>getSearchConnection().endpoint);
-  const [searchCode,setSearchCode]=useState('');
-  const [searchConnected,setSearchConnected]=useState(()=>getSearchConnection().connected);
-  const [savingSearch,setSavingSearch]=useState(false);
-  useEffect(()=>{let active=true;restoreSearchConnection().then(connection=>{if(active){setSearchConnected(connection.connected);setSearchEndpoint(connection.endpoint);}}).catch(error=>{if(active)setStatus(error.message);});return()=>{active=false;};},[]);
   const update=(patch:Partial<AppSettings>)=>{saveSettings({...getSettings(),...patch});setSettings(getSettings());};
   const open=(name:string)=>{
+    if(name==='AI providers'){navigation.navigate('Providers');return;}
+    if(name==='LM Studio'){navigation.navigate('LMStudio');return;}
     setStatus('');
     if(name==='Models & storage') { navigation.navigate('Models');return; }
     setPanel(name);
   };
   const button=(title:string,onPress:()=>void,danger=false)=><TouchableOpacity accessibilityRole="button" onPress={onPress} style={[ui.primary,danger&&{backgroundColor:c.destructive}]}><Text style={ui.primaryText}>{title}</Text></TouchableOpacity>;
-  const row=(title:string,detail:string,onPress:()=>void)=><TouchableOpacity key={title} accessibilityRole="button" onPress={onPress} style={{minHeight:76,paddingVertical:17,borderBottomWidth:1,borderBottomColor:c.border,flexDirection:'row',alignItems:'center',gap:12}}><View style={ui.flex}><Text style={{color:c.text,fontSize:16,fontWeight:'500'}}>{title}</Text>{!!detail&&<Text style={ui.small}>{detail}</Text>}</View><Text style={ui.body}>›</Text></TouchableOpacity>;
+  const row=(title:string,detail:string,onPress:()=>void)=><TouchableOpacity key={title} accessibilityRole="button" onPress={onPress} style={{minHeight:64,paddingVertical:14,borderBottomWidth:1,borderBottomColor:c.border,flexDirection:'row',alignItems:'center',gap:14}}><SettingsIcon name={title}/><View style={ui.flex}><Text style={{color:c.text,fontSize:16,fontWeight:'500'}}>{title}</Text>{!!detail&&<Text style={ui.small}>{detail}</Text>}</View><Text style={ui.body}>›</Text></TouchableOpacity>;
   return <View style={[ui.screen,{paddingTop:insets.top}]}>
-    <View style={[ui.row,{paddingHorizontal:12,borderBottomWidth:1,borderBottomColor:c.border}]}>
+    <GlassBackdrop/>
+    <View style={[ui.row,{marginHorizontal:20,marginTop:8,alignSelf:'flex-start',paddingRight:18,borderRadius:28,backgroundColor:c.surface,borderWidth:1,borderColor:c.border}]}>
       <IconButton glyph="‹" label={panel?'Back to settings':'Back to chat'} onPress={()=>panel?setPanel(''):navigation.goBack()}/>
-      <Text style={[ui.section,{marginTop:0}]}>{panel||'Settings'}</Text>
+      <Text style={ui.body}>{panel?'Settings':'Chat'}</Text>
     </View>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[ui.content,{paddingBottom:insets.bottom+30}]}>
-      {!panel&&sections.map(([name,detail])=>row(name,detail,()=>open(name)))}
+      {!panel&&<>
+        <View style={{alignItems:'center',gap:8,marginBottom:8}}><MoonMark size={44}/><Text style={[ui.title,{fontSize:30,fontWeight:'700'}]}>Settings</Text><Text style={ui.body}>Your Moonlight, your way.</Text></View>
+        {[sections.slice(1,4),[sections[0],sections[4],sections[5]],sections.slice(6)].map((group,index)=><View key={index} style={{gap:8}}><Text style={[ui.small,{letterSpacing:1.5,marginLeft:14}]}>{['MAKE IT YOURS','YOUR INTELLIGENCE','DATA & SUPPORT'][index]}</Text><View style={[ui.card,{paddingHorizontal:20,paddingVertical:0,borderRadius:28,overflow:'hidden'}]}>{group.map(([name,detail])=>row(name,detail,()=>open(name)))}</View></View>)}
+      </>}
+      {!!panel&&<View style={{alignItems:'center',gap:8}}><MoonMark size={40}/><Text style={[ui.title,{fontWeight:'700',fontSize:30,textAlign:'center'}]}>{panel}</Text></View>}
       {panel==='Appearance'&&<>
-        <Text style={[ui.title,{fontSize:29}]}>Make it comfortable.</Text>
+        <View style={[ui.row,{justifyContent:'center',gap:18}]}>{(['glass','glass-night'] as const).map(mode=><TouchableOpacity key={mode} accessibilityRole="radio" accessibilityLabel={mode==='glass'?'Preview Glass':'Preview Glass at night'} accessibilityState={{checked:appearance.mode===mode}} onPress={()=>setAppearance(mode,appearance.largeText)} style={{width:'44%',maxWidth:180,height:230,borderRadius:26,overflow:'hidden',borderWidth:appearance.mode===mode?3:1,borderColor:appearance.mode===mode?c.accent:c.border}}><Image source={mode==='glass'?require('../assets/glass/satin.png'):require('../assets/glass/night.png')} style={{position:'absolute',width:'100%',height:'100%'}}/><View style={{margin:12,marginTop:30,borderRadius:18,padding:12,backgroundColor:mode==='glass'?'#ffffffcc':'#193857dd'}}><Text style={{color:mode==='glass'?'#0B2044':'#F6FAFF',fontSize:15,fontWeight:'700'}}>Moonlight</Text></View><View style={{flex:1}}/><View style={{margin:12,padding:10,borderRadius:18,backgroundColor:mode==='glass'?'#ffffffdd':'#193857dd'}}><Text style={{color:mode==='glass'?'#0B2044':'#F6FAFF',fontSize:12}}>Ask Moonlight…</Text></View></TouchableOpacity>)}</View>
+        <View style={ui.row}><View style={ui.flex}><Text style={ui.body}>Reduce transparency</Text><Text style={ui.small}>Solid surfaces for easier reading.</Text></View><Switch accessibilityLabel="Reduce transparency" value={reducedTransparency()} onValueChange={setReducedTransparency}/></View>
+        <View style={ui.row}><View style={ui.flex}><Text style={ui.body}>Reduce motion</Text><Text style={ui.small}>Keep the activity indicator still. Phone accessibility settings also apply.</Text></View><Switch accessibilityLabel="Reduce motion" value={reducedMotion()} onValueChange={setReducedMotion}/></View>
         <Text style={ui.small}>Choose your look. Changes apply immediately and are saved on this phone.</Text>
         {appearanceChoices.map(choice=><TouchableOpacity key={choice.mode} accessibilityRole="radio" accessibilityLabel={choice.name} accessibilityState={{checked:appearance.mode===choice.mode}} onPress={()=>setAppearance(choice.mode,appearance.largeText)} style={{padding:18,gap:12,borderRadius:16,borderWidth:appearance.mode===choice.mode?2:1,borderColor:appearance.mode===choice.mode?c.accent:c.border,backgroundColor:choice.colors.background}}>
           <View style={ui.row}><Text style={{flex:1,fontSize:20,fontFamily:choice.mode==='mono'?'sans-serif':'serif',color:choice.colors.text}}>{choice.name}</Text><Text style={{fontSize:12,color:choice.colors.textSecondary}}>{appearance.mode===choice.mode?'✓ Selected':'Choose'}</Text></View>
           <Text style={{fontSize:12,lineHeight:19,color:choice.colors.textSecondary}}>{choice.detail}</Text>
           <View style={{flexDirection:'row',gap:8}}>{[choice.colors.surfaceRaised,choice.colors.accentSoft,choice.colors.accent,choice.colors.text].map((color,index)=><View key={index} style={{width:24,height:24,borderRadius:12,backgroundColor:color,borderWidth:1,borderColor:choice.colors.border}}/>)}</View>
         </TouchableOpacity>)}
-        {row('Follow system',appearance.mode==='system'?'Selected · Paper by day, Midnight in dark mode':'Switch between Paper and Midnight with your phone’s appearance',()=>setAppearance('system',appearance.largeText))}
+        {row('Follow system',appearance.mode==='system'?'Selected · Glass by day, Glass at night in dark mode':'Switch the Glass theme with your phone’s appearance',()=>setAppearance('system',appearance.largeText))}
         <View style={ui.row}><View style={ui.flex}><Text style={ui.body}>Larger conversation text</Text><Text style={ui.small}>Your phone’s accessibility text scaling also applies.</Text></View><Switch accessibilityLabel="Larger conversation text" value={appearance.largeText} onValueChange={v=>setAppearance(appearance.mode,v)}/></View>
         <View style={ui.card}><Text style={{color:c.text,fontSize:appearance.largeText?20:16,lineHeight:appearance.largeText?30:25}}>A little clarity starts here.</Text><Text style={ui.small}>Reading preview · Saved automatically</Text></View>
       </>}
       {panel==='Responses'&&<>
         <Text style={ui.body}>How should Moonlight respond?</Text>
         <View style={ui.row}>{(['concise','balanced','detailed'] as const).map(style=><TouchableOpacity accessibilityRole="radio" accessibilityState={{checked:settings.responseStyle===style}} key={style} onPress={()=>update({responseStyle:style})} style={{flex:1,paddingVertical:16,borderRadius:12,backgroundColor:settings.responseStyle===style?c.primary:c.surfaceRaised,alignItems:'center'}}><Text style={{color:settings.responseStyle===style?c.background:c.text,fontSize:13}}>{style[0].toUpperCase()+style.slice(1)}</Text></TouchableOpacity>)}</View>
-        <Text style={ui.section}>Personal instructions</Text><Text style={ui.small}>Tell Moonlight how you prefer it to help. These instructions stay on your phone.</Text>
+        <Text style={ui.section}>Personal instructions</Text><Text style={ui.small}>Tell Moonlight how you prefer it to help. Cloud chats include these instructions with your request.</Text>
         <TextInput accessibilityLabel="Personal instructions" multiline maxLength={4000} value={prompt} onChangeText={setPrompt} style={[ui.input,{minHeight:180,textAlignVertical:'top'}]}/>
         {button('Save instructions',()=>{if(!prompt.trim()){setStatus('Write an instruction before saving.');return;}update({systemPrompt:prompt.trim()});setStatus('Instructions saved.');})}
       </>}
@@ -73,26 +81,12 @@ export function SettingsScreen({navigation}: any) {
         <View style={{marginTop:40,gap:16}}><Text style={ui.small}>Clearing history removes all saved conversations. Your downloaded models and saved memories are kept.</Text>
         {button('Delete all conversations',()=>Alert.alert('Delete all conversations?','This cannot be undone. Models and saved memories are kept.',[{text:'Cancel',style:'cancel'},{text:'Delete',style:'destructive',onPress:()=>{clearConversations();setStatus('Conversation history deleted.');}}]),true)}</View>
       </>}
-      {panel==='Web search'&&<>
-        <Text style={[ui.title,{fontSize:29}]}>The web, when you need it.</Text>
-        <Text style={ui.small}>CLOSED ALPHA · Optional web access</Text>
-        <View style={[ui.card,{backgroundColor:c.accentSoft}]}><Text style={[ui.section,{marginTop:0}]}>{searchConnected?'● Connection saved':'○ Set up your connection'}</Text><Text style={ui.body}>{searchConnected?'Ready to try from chat. Your next search will verify access with the server.':'Connect with the server address and private access key supplied by Moonlight’s alpha administrator.'}</Text></View>
-        <Text style={ui.section}>Connection details</Text>
-        <Text style={ui.small}>Search address</Text><TextInput accessibilityLabel="Search service address" autoCapitalize="none" autoCorrect={false} value={searchEndpoint} onChangeText={setSearchEndpoint} style={ui.input}/>
-        <Text style={ui.small}>Your private access key</Text><TextInput accessibilityLabel="Alpha search access code" secureTextEntry autoCapitalize="none" autoCorrect={false} value={searchCode} onChangeText={setSearchCode} style={ui.input}/>
-        {button(savingSearch?'Saving securely…':'Save search connection',async()=>{if(savingSearch)return;setSavingSearch(true);try{await saveSearchConnection(searchEndpoint,searchCode);setSearchCode('');setSearchConnected(true);setStatus('Saved securely on this phone. Enable Web in chat. Server access will be checked on your next search.');}catch(error:any){setStatus(error.message);}finally{setSavingSearch(false);}})}
-        {searchConnected&&row('Disconnect search','Remove the saved access key from this phone',async()=>{try{await disconnectSearch();setSearchConnected(false);setSearchEndpoint('');setStatus('Search disconnected.');}catch(error:any){setStatus(error.message);}})}
-        <View style={ui.card}><Text style={[ui.section,{marginTop:0}]}>Ask naturally</Text><Text style={ui.body}>1. Return to chat and turn Web on.</Text><Text style={ui.body}>2. Type or speak your question.</Text><Text style={ui.body}>3. Moonlight searches automatically and uses the results to answer with source links.</Text></View>
-        <Text style={ui.section}>Your conversation stays local</Text>
-        <Text style={ui.body}>While Web is on, the first 400 characters of each new message are sent to the configured server and its search engines. This includes spoken messages. Saved history, memories and attachments are not uploaded. Web stays on until you turn it off or restart the app.</Text>
-        <Text style={ui.small}>Your key is encrypted on this phone using Android Keystore and restored after restarting. Disconnect removes it. Up to 20 search attempts per tester per UTC day. Busy or failed searches may require retrying.</Text>
-      </>}
       {panel==='Privacy'&&<>
         <Text style={[ui.title,{fontSize:29}]}>Know where data goes.</Text>
-        <Text style={ui.section}>Conversations & memory</Text><Text style={ui.body}>Text generation runs locally. Chats and memories are stored inside the app’s private storage. App-level database encryption is not enabled.</Text>
+        <Text style={ui.section}>Conversations & memory</Text><Text style={ui.body}>On-device models generate locally. Cloud models send recent conversation text to your chosen provider after confirmation. Chats and memories remain saved in private app storage; the chat database is not encrypted. API keys are stored separately with Android Keystore encryption.</Text>
         <Text style={ui.section}>Files & voice</Text><Text style={ui.body}>Only text attachments are read by the model, up to 512 KB. Voice recognition uses your phone’s speech service and may process audio online.</Text>
         <Text style={ui.section}>Downloads & sharing</Text><Text style={ui.body}>Models download from Hugging Face. Sharing passes the selected text to an app you choose. Response reporting is unavailable unless configured for the build.</Text>
-        <Text style={ui.section}>Optional web search</Text><Text style={ui.body}>When Web is on, search runs automatically using the first 400 characters of your new message. Source links are saved with the answer. Opening a source contacts that website through your browser.</Text>
+        <Text style={ui.section}>Optional web search</Text><Text style={ui.body}>Supported cloud models can decide to use provider web search. The provider receives your conversation and may send queries to search services. Search can incur provider charges. Source links are saved with the answer. On-device models do not browse.</Text>
         {row('Read privacy policy','',()=>navigation.navigate('PrivacyPolicy'))}
       </>}
       {panel==='Advanced'&&<>
@@ -105,7 +99,7 @@ export function SettingsScreen({navigation}: any) {
           {key:'maxTokens',label:'Response token limit',help:'Maximum new tokens per answer.',step:128,min:64,max:2048}] as const).map(item=><View key={item.key} style={ui.row}><View style={ui.flex}><Text style={ui.body}>{item.label}</Text><Text style={ui.small}>{item.help}</Text></View><IconButton glyph="−" label={`Decrease ${item.label}`} onPress={()=>update({[item.key]:Math.max(item.min,Number((settings[item.key]-item.step).toFixed(2)))})}/><Text style={ui.body}>{settings[item.key]}</Text><IconButton glyph="＋" label={`Increase ${item.label}`} onPress={()=>update({[item.key]:Math.min(item.max,Number((settings[item.key]+item.step).toFixed(2)))})}/></View>)}
       </>}
       {panel==='About & help'&&<>
-        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.3.4 · Closed alpha</Text>
+        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.6.1 · Glass alpha</Text>
         {row('Model licenses & attribution','',()=>navigation.navigate('ModelAttribution'))}
         {row('Privacy policy','',()=>navigation.navigate('PrivacyPolicy'))}
         <Text style={ui.section}>Download failed?</Text><Text style={ui.body}>Check your connection and available storage, then retry. Keep the app open during large downloads.</Text>
@@ -117,3 +111,10 @@ export function SettingsScreen({navigation}: any) {
     </ScrollView>
   </View>;
 }
+
+
+
+
+
+
+

@@ -1,9 +1,14 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {safeWebUrl} from '../services/webSearch';
 import {Theme, themedStyles, useAppearance, getAppearance} from '../constants/theme';
 
 function inline(text: string) {
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => (
+  return text.split(/(\[[^\]]+\]\(https:\/\/[^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+    const link=/^\[([^\]]+)\]\((https:\/\/[^\s)]+)\)$/.exec(part);
+    const url=link&&safeWebUrl(link[2]);
+    if(url)return <Text key={i} accessibilityRole="link" style={{color:Theme.color.accent,textDecorationLine:'underline'}} onPress={()=>Linking.openURL(url).catch(()=>Alert.alert('Unable to open source','Try again in your browser.'))}>{link![1]}</Text>;
+    return (
     <Text
       key={i}
       style={
@@ -20,7 +25,7 @@ function inline(text: string) {
         ? part.slice(1, -1)
         : part}
     </Text>
-  ));
+  );});
 }
 
 export function AnswerText({ content }: { content: string }) {

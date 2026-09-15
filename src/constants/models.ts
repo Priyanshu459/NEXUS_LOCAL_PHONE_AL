@@ -150,7 +150,19 @@ export const MODEL_CATALOG: ModelMetadata[] = [
   }
 ];
 
-// Restrict this phone-test release to compact models pending the freeze investigation.
-export const AVAILABLE_MODELS = MODEL_CATALOG.filter(model =>
-  model.id === 'llama32-1b' || model.id === 'qwen25-15b',
-);
+// Official publisher files, pinned to verified revisions and SHA-256 hashes.
+const lfm = (id:string, name:string, repo:string, revision:string, file:string, bytes:number, sha256:string, desc:string):ModelMetadata => ({
+  id,name,desc,provider:'Liquid AI',badge:'On this phone',tags:['GGUF','Q4_K_M','Text chat'],
+  url:`https://huggingface.co/LiquidAI/${repo}/resolve/${revision}/${file}`,expectedSizeBytes:bytes,sha256,
+  size:`${Math.round(bytes/1000000)} MB`,color:'#075DE1',originalPublisher:'Liquid AI',quantizationPublisher:'Liquid AI',
+  originalModelUrl:`https://huggingface.co/LiquidAI/${repo.replace('-GGUF','')}`,
+  quantizedRepoUrl:`https://huggingface.co/LiquidAI/${repo}`,licenseIdentifier:'LFM Open License 1.0',
+  licenseUrl:`https://huggingface.co/LiquidAI/${repo}/blob/${revision}/LICENSE`,isLicenseVerified:true,
+});
+export const AVAILABLE_MODELS:ModelMetadata[] = [
+  lfm('lfm2-350m','LFM2 350M','LFM2-350M-GGUF','8fdc9d526b7ed346b19257551b05816c7912ecc2','LFM2-350M-Q4_K_M.gguf',229309376,'a4d000c7064bd3b2e42c6845836286a899a4e79cf1791da1a6797b58d575957d','The smallest download. A starting point for simple on-device conversations.'),
+  lfm('lfm2-700m','LFM2 700M','LFM2-700M-GGUF','fd39e80d7a5ac61494ffff577e61bbbfddbd0d02','LFM2-700M-Q4_K_M.gguf',468624320,'684e8406dc13321452b3f6aeca432776e2a6a7e1ad6c23f7887b8fe3efbe2efa','A compact option for everyday writing, questions and summaries.'),
+  lfm('lfm25-12b','LFM2.5 1.2B Instruct','LFM2.5-1.2B-Instruct-GGUF','6767265158422fb8a19c62ceb45f16f05363615b','LFM2.5-1.2B-Instruct-Q4_K_M.gguf',730895168,'b1b3de114215d9507409a662a501a631095a479a419584e8a2ded6304b19b4f5','Instruction-tuned local chat with a larger memory requirement.'),
+];
+// Legacy metadata stays available for attribution and existing installations.
+MODEL_CATALOG.push(...AVAILABLE_MODELS);

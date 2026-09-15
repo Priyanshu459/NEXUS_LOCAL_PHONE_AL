@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+  
+  body, html {
+    margin: 0;
+    padding: 0;
+    width: 1024px;
+    height: 500px;
+    background: linear-gradient(135deg, #121212 0%, #1e1e24 100%);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .card {
+    width: 760px;
+    height: 320px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-left: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 32px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    display: flex;
+    align-items: center;
+    padding: 0 64px;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Subtle shine effect */
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 50%; height: 100%;
+    background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%);
+    transform: skewX(-25deg);
+    animation: shine 4s infinite;
+  }
+
+  .icon-container {
+    width: 180px;
+    height: 180px;
+    background: #ffffff;
+    border-radius: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 48px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  }
+
+  .icon-container img {
+    width: 120px;
+    height: 120px;
+    /* We'll use the dark brand icon inside the white container, so it looks just like the screenshot */
+  }
+
+  .text-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .title {
+    color: #ffffff;
+    font-size: 56px;
+    font-weight: 700;
+    margin: 0 0 12px 0;
+    letter-spacing: -1px;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+
+  .subtitle {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 24px;
+    font-weight: 400;
+    margin: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .subtitle::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #4db8ff;
+    border-radius: 50%;
+    margin-right: 12px;
+    box-shadow: 0 0 8px #4db8ff;
+  }
+</style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="icon-container">
+      <img src="src/assets/branding/moon-brand-dark.png" alt="Moonlight Icon">
+    </div>
+    <div class="text-content">
+      <h1 class="title">Moonlight AI</h1>
+      <p class="subtitle">Private, on-device workspace</p>
+    </div>
+  </div>
+
+</body>
+</html>

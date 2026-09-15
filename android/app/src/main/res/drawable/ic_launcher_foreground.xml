@@ -7,11 +7,7 @@
     <group
         android:translateX="22"
         android:translateY="22">
-        <!-- Circle -->
-        <path
-            android:pathData="M32,3A29,29 0 1,0 32,61A29,29 0 1,0 32,3z"
-            android:fillColor="#ffffff"/>
-        <!-- Moon -->
+        <!-- Original crescent on a transparent foreground -->
         <group
             android:translateX="10"
             android:translateY="10"
@@ -26,3 +22,4 @@
         </group>
     </group>
 </vector>
+

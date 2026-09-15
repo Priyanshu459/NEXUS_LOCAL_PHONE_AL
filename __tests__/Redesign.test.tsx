@@ -30,26 +30,15 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-test('alpha search settings expose a masked key and server address', async () => {
-  let view!: Renderer.ReactTestRenderer;
-  await act(async () => {view = Renderer.create(<SettingsScreen navigation={navigation} />);});
-  await act(async () => button(view, 'Web search').props.onPress());
-  expect(view.root.findAllByType(TextInput)).toHaveLength(2);
-  expect(view.root.findByProps({accessibilityLabel:'Alpha search access code'}).props.secureTextEntry).toBe(true);
-  expect(JSON.stringify(view.toJSON())).toContain('Set up your connection');
-  await act(async () => view.unmount());
-});
-
-test('web toggle enables automatic search without a query form or an immediate request', async () => {
-  saveSearchConnection('https://search.example.com/search','a'.repeat(43));
-  NativeModules.DeviceControl.requestWebSearch = jest.fn();
-  let view!: Renderer.ReactTestRenderer;
-  await act(async()=>{view=Renderer.create(<ChatScreen navigation={navigation as any} route={{params:{}} as any}/>);});
-  await act(async()=>view.root.findAllByType(TouchableOpacity).find(b=>b.props.accessibilityLabel==='Web search')!.props.onPress());
-  expect(NativeModules.DeviceControl.requestWebSearch).not.toHaveBeenCalled();
-  expect(view.root.findAllByType(TextInput).find(i=>i.props.accessibilityLabel==='Search query')).toBeUndefined();
-  expect(view.root.findAllByType(TouchableOpacity).find(b=>b.props.accessibilityLabel==='Web search')!.props.accessibilityState.checked).toBe(true);
-  await act(async()=>view.unmount());
+test('legacy search settings and chat agent controls are removed',async()=>{
+ let view!:Renderer.ReactTestRenderer;
+ await act(async()=>{view=Renderer.create(<SettingsScreen navigation={navigation}/>);});
+ expect(button(view,'Web search')).toBeUndefined();
+ await act(async()=>view.unmount());
+ await act(async()=>{view=Renderer.create(<ChatScreen navigation={navigation as any} route={{params:{}} as any}/>);});
+ expect(view.root.findAllByProps({accessibilityLabel:'Web search'})).toHaveLength(0);
+ expect(view.root.findAllByProps({accessibilityLabel:'Agent mode'})).toHaveLength(0);
+ await act(async()=>view.unmount());
 });
 test('response presets and personal instructions persist through the real controls', async () => {
   let view!: Renderer.ReactTestRenderer;
@@ -138,3 +127,5 @@ test('stopping generation safely handles non-promise stopCompletion without thro
   // Verify unmounting safely stops completion without throwing
   await expect(act(async () => view.unmount())).resolves.not.toThrow();
 });
+
+

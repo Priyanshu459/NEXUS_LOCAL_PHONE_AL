@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, ImageStyle, StyleProp } from 'react-native';
+import {Theme,useAppearance} from '../constants/theme';
 
 export const MOONLIGHT_BRAND_SIZE = {
   compact: 24,
@@ -23,10 +24,11 @@ export function MoonlightBrandIcon({
   size = MOONLIGHT_BRAND_SIZE.header,
   style,
 }: MoonlightBrandIconProps) {
+  useAppearance();
   return (
     <Image
       source={require('../assets/branding/moon-brand-dark.png')}
-      style={[{ width: size, height: size }, style]}
+      style={[{ width: size, height: size, tintColor:Theme.color.text }, style]}
       resizeMode="contain"
       accessible
       accessibilityRole="image"

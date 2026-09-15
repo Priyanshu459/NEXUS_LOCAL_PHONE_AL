@@ -56,7 +56,7 @@ export function PageIntro({
 }
 export const ui = themedStyles(() => ({
   screen: { flex: 1, backgroundColor: c.background },
-  content: { padding: 22, gap: 18 },
+  content: { padding: 22, gap: 18, width:'100%', maxWidth:760, alignSelf:'center' },
   intro: { gap: 12, marginTop: 14, marginBottom: 12 },
   eyebrow: {
     color: c.accent,
@@ -72,10 +72,10 @@ export const ui = themedStyles(() => ({
     lineHeight: 43,
     letterSpacing: -1.4,
   },
-  body: { color: c.textSecondary, fontSize: 14, lineHeight: 22 },
+  body: { color: c.textSecondary, fontSize: 15, lineHeight: 23 },
   card: {
     backgroundColor: c.surface,
-    borderRadius: 16,
+    borderRadius: 26,
     padding: 20,
     gap: 12,
     borderWidth: 1,
@@ -86,13 +86,13 @@ export const ui = themedStyles(() => ({
   flex: { flex: 1 },
   primary: {
     minHeight: 52,
-    borderRadius: 16,
+    borderRadius: 26,
     paddingHorizontal: 18,
     backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryText: { color: c.background, fontSize: 14, fontWeight: '700' },
+  primaryText: { color: Theme.onPrimary, fontSize: 14, fontWeight: '700' },
   iconButton: {
     width: 48,
     height: 48,
@@ -105,12 +105,12 @@ export const ui = themedStyles(() => ({
   input: {
     borderWidth: 1,
     borderColor: c.border,
-    borderRadius: 14,
+    borderRadius: 19,
     minHeight: 52,
     color: c.text,
     padding: 14,
     fontSize: 14,
-    backgroundColor: c.background,
+    backgroundColor: c.surfaceRaised,
   },
   small: { color: c.textMuted, fontSize: 12, lineHeight: 19 },
 }));

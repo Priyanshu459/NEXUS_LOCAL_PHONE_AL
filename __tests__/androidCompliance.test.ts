@@ -77,7 +77,8 @@ describe('Android release compliance configuration', () => {
     expect(buildGradle).toContain(
       'Release artifacts are never signed with the debug key',
     );
-    expect(buildGradle).toContain('usesCleartextTraffic: "false"');
+    // Android must permit opt-in private LAN HTTP; native policy separately rejects cloud/public HTTP.
+    expect(buildGradle).toContain('usesCleartextTraffic: "true"');
     expect(buildGradle).toContain('debuggable false');
     expect(buildGradle).toContain('signingConfig null');
     expect(buildGradle).not.toContain(

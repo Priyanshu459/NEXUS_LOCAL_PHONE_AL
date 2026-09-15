@@ -1,4 +1,5 @@
 import { Theme, themedStyles, useAppearance } from '../constants/theme';
+import {GlassBackdrop} from '../components/GlassBackdrop';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -48,6 +49,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
   };
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <GlassBackdrop/>
       <View style={styles.header}>
         <TouchableOpacity
           accessibilityRole="button"
@@ -59,15 +61,18 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.updated}>Effective date: September 7, 2026</Text>
+        <Text style={styles.updated}>Effective date: September 14, 2026</Text>
+        <Text style={styles.heading}>LM Studio connections</Text>
+        <Text style={styles.body}>Connecting LM Studio sends the selected conversation and instructions to your configured computer server. That server can route models through its own LM Link. Moonlight does not join LM Link directly. Server tokens are encrypted in Android Keystore. Private-IP HTTP requires opting in and is not encrypted by Moonlight; use a trusted network, a VPN, or HTTPS. Public HTTP destinations and redirects are blocked by the provider transport.</Text>
         <Text style={styles.heading}>Local data</Text>
         <Text style={styles.body}>
           Chats, settings, saved memories, downloaded GGUF models, and text read
           from documents you select are stored or processed on your device.
           Moonlight AI does not include user accounts, advertising SDKs,
-          analytics SDKs, or cloud AI inference.
+          or analytics SDKs. Optional cloud inference is described below.
         </Text>
         <Text style={styles.heading}>Network activity</Text>
+        <Text style={styles.body}>When you choose a cloud model, Moonlight asks before sending a conversation to that provider. Up to 20 recent messages, your personal instructions, approved text attachments and search excerpts are sent for the answer. Saved memories are not included. The provider processes this data under its own policies and may charge for API usage. Provider keys and endpoint details are encrypted using Android Keystore; removal in AI providers deletes the saved credential. No keys are embedded in the app.</Text>
         <Text style={styles.body}>
           Moonlight AI connects to Hugging Face to resolve and download models
           you choose. Hugging Face receives normal network information such as
@@ -75,7 +80,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           policy.
         </Text>
         <Text style={styles.heading}>Documents and speech</Text>
-        <Text style={styles.body}>When Web is on, Moonlight automatically sends the first 400 characters of each new typed or spoken message to the configured search backend and its upstream search engines. Web stays on until disabled or the app restarts. Saved history, memories and attachments are not uploaded. The alpha backend stores access-code hashes and daily request counts, not queries or results. Infrastructure providers may retain network metadata. Source links and excerpts are saved with the conversation; opening a source contacts that site. The access key is encrypted on this phone using Android Keystore and restored after restarting. Disconnect in Web search settings removes it. App backup is disabled.</Text>
+        <Text style={styles.body}>Supported OpenAI and Anthropic cloud models can automatically use provider web search. The provider processes conversation context and generated search queries under its policies; tool fees may apply. Source links are saved with the answer. Opening a source contacts its website. The old alpha search-server connection and Agent mode have been removed. There is no Gmail connection.</Text>
         <Text style={styles.body}>
           The Android system document picker grants access only to a document
           you select. Supported text is read into the current local chat. Voice
@@ -188,3 +193,4 @@ const styles = themedStyles(() => ({
   linkText: { color: Theme.color.accent, fontWeight: '800' },
   pending: { marginTop: 24, color: Theme.color.warning, fontSize: 13, lineHeight: 19 },
 }));
+

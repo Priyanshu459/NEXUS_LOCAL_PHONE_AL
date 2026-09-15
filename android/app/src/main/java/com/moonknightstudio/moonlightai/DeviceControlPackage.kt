@@ -8,7 +8,7 @@ import com.facebook.react.uimanager.ViewManager
 class DeviceControlPackage : ReactPackage {
   override fun createNativeModules(
     reactContext: ReactApplicationContext,
-  ): List<NativeModule> = listOf(DeviceControlModule(reactContext))
+  ): List<NativeModule> = listOf(DeviceControlModule(reactContext), AppUpdatesModule(reactContext))
 
   override fun createViewManagers(
     reactContext: ReactApplicationContext,

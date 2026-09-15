@@ -11,9 +11,10 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** Only ciphertext is persisted. The encryption key remains in Android Keystore. */
-class SearchCredentialStore(context: Context) {
-  private val prefs = context.getSharedPreferences("moonlight_search_secret", Context.MODE_PRIVATE)
-  private val alias = "moonlight.search.v1"
+class SearchCredentialStore(context: Context, namespace: String = "search") {
+  init { require(namespace.matches(Regex("[a-zA-Z0-9_-]{1,100}"))) }
+  private val prefs = context.getSharedPreferences("moonlight_${namespace}_secret", Context.MODE_PRIVATE)
+  private val alias = "moonlight.$namespace.v1"
   private fun key(): SecretKey {
     val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
     (store.getKey(alias, null) as? SecretKey)?.let { return it }

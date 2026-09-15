@@ -129,6 +129,7 @@ export function ModelAttributionScreen({ navigation }: Props) {
                   {attr.license}
                 </Text>
               </View>
+              <TouchableOpacity accessibilityRole="link" onPress={()=>Linking.openURL(model.licenseUrl)}><Text style={styles.link}>Read publisher license</Text></TouchableOpacity>
               
               {isUnverified && (
                 <Text style={styles.warning}>

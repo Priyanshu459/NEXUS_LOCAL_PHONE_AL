@@ -37,6 +37,22 @@ class DeviceControlModule(
   }
 
   private var speechPromise: Promise? = null
+  private val providerClient = ProviderClient(appContext)
+  @ReactMethod fun reviewCalendarEvent(title: String, start: Double, end: Double, promise: Promise) {
+    try {
+      require(title.isNotBlank() && title.length <= 160 && start.isFinite() && end.isFinite() && end > start)
+      val intent = Intent(Intent.ACTION_INSERT).setData(android.provider.CalendarContract.Events.CONTENT_URI)
+        .putExtra(android.provider.CalendarContract.Events.TITLE, title)
+        .putExtra(android.provider.CalendarContract.EXTRA_EVENT_BEGIN_TIME, start.toLong())
+        .putExtra(android.provider.CalendarContract.EXTRA_EVENT_END_TIME, end.toLong())
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      appContext.startActivity(intent); promise.resolve(true)
+    } catch (_: Exception) { promise.reject("CALENDAR_UNAVAILABLE", "No compatible calendar app is available.") }
+  }
+  @ReactMethod fun saveProvider(id: String, value: String, promise: Promise) = providerClient.save(id, value, promise)
+  @ReactMethod fun removeProvider(id: String, promise: Promise) = providerClient.remove(id, promise)
+  @ReactMethod fun requestProvider(requestId: String, id: String, operation: String, model: String, body: String, promise: Promise) = providerClient.request(requestId, id, operation, model, body, promise)
+  @ReactMethod fun cancelProvider(requestId: String) = providerClient.cancel(requestId)
   private val searchCredentials = SearchCredentialStore(appContext)
   private val credentialExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
 

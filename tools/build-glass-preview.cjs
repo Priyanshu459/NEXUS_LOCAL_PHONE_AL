@@ -1,0 +1,7 @@
+const path=require('path');const fs=require('fs');
+const root=path.resolve(__dirname,'..');const runtime=path.join(root,'.local-release/ui-preview/node_modules');
+const esbuild=require(path.join(runtime,'esbuild'));const out=path.join(root,'output/glass-preview');fs.mkdirSync(out,{recursive:true});
+esbuild.buildSync({entryPoints:[path.join(root,'tools/glass-preview.tsx')],bundle:true,outfile:path.join(out,'app.js'),platform:'browser',define:{global:'globalThis','process.env.NODE_ENV':'"development"',__DEV__:'true'},alias:{react:path.join(runtime,'react'),'react-dom':path.join(runtime,'react-dom'),'react-native':path.join(root,'.local-release/preview-native.ts'),'react-native-web':path.join(runtime,'react-native-web'),'react-native-mmkv':path.join(root,'.local-release/preview-storage.ts'),'react-native-fs':path.join(root,'.local-release/preview-fs.ts'),'llama.rn':path.join(root,'.local-release/preview-llama.ts'),'react-native-safe-area-context':path.join(root,'.local-release/preview-safe.ts'),'@react-navigation/native':path.join(root,'.local-release/preview-nav.ts')},loader:{'.png':'dataurl'}});
+fs.writeFileSync(path.join(out,'index.html'),'<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Moonlight Glass UI preview</title><style>html,body,#root{height:100%;margin:0}#root{display:flex;flex-direction:column}body{font-family:Arial;background:#dcecfb}</style></head><body><div id="root"></div><script src="app.js"></script></body></html>');
+console.log(out);
+

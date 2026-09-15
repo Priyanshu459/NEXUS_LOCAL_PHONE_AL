@@ -2,10 +2,11 @@
 <!--
   Adaptive launcher icon — Android 8.0+ (API 26+)
   Foreground: official Moonlight AI website icon
-  Background: @color/ic_launcher_background
+  Background: @drawable/ic_launcher_glass
   Source: https://moonlight-ai-app.pages.dev/icon.svg
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
+    <background android:drawable="@drawable/ic_launcher_glass"/>
     <foreground android:drawable="@drawable/ic_launcher_foreground"/>
 </adaptive-icon>
+

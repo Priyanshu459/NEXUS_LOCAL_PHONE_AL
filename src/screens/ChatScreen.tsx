@@ -37,7 +37,7 @@ import {
 } from '../services/modelManager';
 import { initLlama, LlamaContext } from 'llama.rn';
 import {checkLoadCapacity, serializeModelLoad} from '../services/modelLoadGuard';
-import {getSearchConnection, restoreSearchConnection, searchWeb, sanitizeSources, WebSource} from '../services/webSearch';
+import {sanitizeSources, WebSource} from '../services/webSearch';
 import {
   getMemoryContextString,
   addMemory,
@@ -53,8 +53,12 @@ import { fitContext } from '../services/contextWindow';
 import { listConversations, saveConversation } from '../services/conversations';
 import { AnswerText } from '../components/AnswerText';
 import { MoonMark, IconButton, ui } from '../components/Design';
-import { Theme, themedStyles, useAppearance } from '../constants/theme';
-import { AVAILABLE_MODELS } from '../constants/models';
+import { Theme, themedStyles, useAppearance,isGlass,isDark } from '../constants/theme';
+import {GlassBackdrop} from '../components/GlassBackdrop';
+import {withoutAction} from '../services/agentActions';
+import {LunarPulse} from '../components/LunarPulse';
+import {CloudSelection,getCloudSelection,selectCloud,listProviders,completeCloud} from '../services/providers';
+import { AVAILABLE_MODELS, MODEL_CATALOG, ModelMetadata } from '../constants/models';
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 type Message = PersistedMessage;
 const MODEL_CONTEXT_SIZE = 1024;
@@ -252,10 +256,13 @@ function ReportResponseModal({
 
 export function ChatScreen({ navigation, route }: Props) {
   const appearance = useAppearance();
+  const [cloud,setCloud]=useState(getCloudSelection);
+  const [modelTab,setModelTab]=useState<'device'|'cloud'|'computer'>('device');
+  const [eligibleModels,setEligibleModels]=useState<ModelMetadata[]>([]);
+  const [modelSearch,setModelSearch]=useState('');
+  const cloudAbort=useRef<AbortController|null>(null);
+  const cloudConsent=useRef('');
   const [drawer, setDrawer] = useState(false);
-  const [webEnabled, setWebEnabled] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const searchAbort = useRef<AbortController | null>(null);
   const [recommendation, setRecommendation] = useState('');
   const [recommendedId, setRecommendedId] = useState('');
   const conversationId = useRef(
@@ -271,7 +278,7 @@ export function ChatScreen({ navigation, route }: Props) {
     mounted.current = true;
     return () => {
       mounted.current = false;
-      searchAbort.current?.abort();
+      cloudAbort.current?.abort();
     };
   }, []);
   const [contextNotice, setContextNotice] = useState('');
@@ -311,7 +318,7 @@ export function ChatScreen({ navigation, route }: Props) {
       const result = await deviceControl.startSpeechRecognition();
       if (mounted.current && typeof result === 'string' && result.trim()) {
         Keyboard.dismiss();
-        if (llamaRef.current && !generationBusy.current) {
+        if ((llamaRef.current || cloud) && !generationBusy.current) {
           await handleSendMessage(result);
         } else {
           setInputText(result);
@@ -362,6 +369,10 @@ export function ChatScreen({ navigation, route }: Props) {
 
   const llamaRef = useRef<LlamaContext | null>(null);
   const listRef = useRef<FlatList>(null);
+  const contentHeight = useRef(0);
+  const followReply = useRef(true);
+  const scrollToLatest = () => {if(followReply.current)requestAnimationFrame(()=>listRef.current?.scrollToOffset({offset:contentHeight.current,animated:false}));};
+  useEffect(()=>{followReply.current=true;scrollToLatest();},[isGenerating,isKeyboardVisible]);
 
   const modelFilename = getModelFilenameFromUrl(settings.modelUrl);
 
@@ -369,14 +380,15 @@ export function ChatScreen({ navigation, route }: Props) {
     let active = true;
     getDeviceRecommendation().then(async result => {
       if (!active) return;
-      setRecommendation(result.reason); setRecommendedId(result.model.id);
+      setRecommendation(result.reason); setRecommendedId(result.model.id);setEligibleModels(result.models);
       const saved = getSettings();
-      if (!storage.getString('model_recommendation_done') && saved.modelUrl === defaultSettings.modelUrl) {
+      if (!storage.getString('lfm_catalog_checked') && MODEL_CATALOG.some(m=>m.url===saved.modelUrl)) {
         const exists = await checkModelExists(getModelFilenameFromUrl(saved.modelUrl));
         if (!active) return;
         if (!exists) { const next = {...saved, modelUrl: result.model.url}; saveSettings(next); setSettings(next); }
       }
       storage.set('model_recommendation_done', 'true');
+      storage.set('lfm_catalog_checked','true');
     });
     return () => { active = false; };
   }, []);
@@ -399,8 +411,9 @@ export function ChatScreen({ navigation, route }: Props) {
   useEffect(() => {
     const unsub = navigation.addListener('focus', () => {
       setSettings(getSettings());
+      setCloud(getCloudSelection());
       // A download may have completed in Models without changing the selected URL.
-      if (!llamaRef.current && getSettings().modelUrl === settings.modelUrl) {
+      if (!getCloudSelection() && !llamaRef.current && getSettings().modelUrl === settings.modelUrl) {
         void checkAndInit(modelEpoch.current);
       }
       if (messages.length && !listConversations().some(c => c.id === conversationId.current)) {
@@ -411,6 +424,7 @@ export function ChatScreen({ navigation, route }: Props) {
   }, [navigation, messages.length, settings.modelUrl]);
 
   useEffect(() => {
+    if(cloud){setIsAppBooting(false);setModelReady(false);return;}
     setIsAppBooting(true);
     setModelReady(false);
     const epoch = ++modelEpoch.current;
@@ -421,7 +435,6 @@ export function ChatScreen({ navigation, route }: Props) {
       clearTimeout(initTimer);
       modelEpoch.current = epoch + 1;
       cancelRequested.current = true;
-      searchAbort.current?.abort();
       const context = llamaRef.current;
       llamaRef.current = null;
       if (context) {
@@ -441,7 +454,7 @@ export function ChatScreen({ navigation, route }: Props) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings.modelUrl]);
+  }, [settings.modelUrl,cloud?.providerId,cloud?.model]);
 
   useEffect(() => {
     if (messages.length > 0 && !isGenerating) {
@@ -481,6 +494,8 @@ export function ChatScreen({ navigation, route }: Props) {
       urlToDownload.split('/').pop()?.split('?')[0] || 'model.gguf';
 
     try {
+      const capacity=await getDeviceRecommendation();
+      if(!capacity.models.some(m=>m.url===urlToDownload))throw new Error('No download is offered for this model under the current memory check. Choose a compatible LFM model in Models & storage.');
       const downloadedPath = await downloadModel(urlToDownload, filename, p =>
         setDownloadProgress(p),
       );
@@ -560,16 +575,21 @@ export function ChatScreen({ navigation, route }: Props) {
     }
   });
 
-  const handleSendMessage = async (textOverride?: string, historyOverride?: Message[]) => {
+  const handleSendMessage = async (textOverride?: string, historyOverride?: Message[], approvedCloud=false) => {
     const rawInput = (
       textOverride !== undefined ? textOverride : inputText
     ).trim();
     if (
       (!rawInput && !attachedFile) ||
       generationBusy.current ||
-      !llamaRef.current
+      (!llamaRef.current && !cloud)
     )
       return;
+    const consentKey=`${conversationId.current}:${cloud?.providerId}:${cloud?.model}`;
+    if(cloud && !approvedCloud && (cloudConsent.current!==consentKey || attachedFile)){
+      const provider=listProviders().find(p=>p.id===cloud.providerId);
+      Alert.alert(`Send to ${provider?.name||'cloud provider'}?`,provider?.connectionType==='lmstudio'?'This sends up to 20 recent messages, your personal instructions and attached text to your LM Studio server. Saved memories stay on this phone. Your server may route requests to a linked computer. Private-network HTTP is unencrypted unless protected by your VPN.':'This sends up to 20 recent messages, your personal instructions and any attached text to this provider. Saved memories stay local. Supported models may use provider web search and send queries to search services. Provider and tool charges may apply.',[{text:'Cancel',style:'cancel'},{text:'Send',onPress:()=>{cloudConsent.current=consentKey;void handleSendMessage(textOverride,historyOverride,true);}}]);return;
+    }
     generationBusy.current = true;
     cancelRequested.current = false;
     const context = llamaRef.current;
@@ -599,23 +619,23 @@ export function ChatScreen({ navigation, route }: Props) {
     setIsGenerating(true);
 
     let fullResponse = '';
-    const turnQuery = webEnabled ? rawInput.slice(0,400) : '';
     let usedSources: WebSource[] = [];
     try {
       let webSources: WebSource[] | undefined;
-      if (turnQuery) {
-        setSearching(true);
-        searchAbort.current = new AbortController();
-        webSources = await searchWeb(turnQuery, searchAbort.current.signal);
-        if (cancelRequested.current || !mounted.current) throw new Error('Search cancelled.');
-        setSearching(false);
-      }
+      if(cloud){
+        cloudAbort.current=new AbortController();
+        const cloudMessages=newMessages.map((m,i)=>i===newMessages.length-1 && currentAttachmentText?{...m,content:m.content+'\n\nAttached text:\n'+currentAttachmentText}:m);
+        fullResponse=await completeCloud(cloud,cloudMessages,settings.systemPrompt,settings.maxTokens,undefined,cloudAbort.current.signal,sources=>{usedSources=sources;});
+
+        if(cancelRequested.current || !mounted.current)throw new Error('Request cancelled.');
+      }else{
+      if(!context)throw new Error('The local model is not ready.');
       const formattedResult = await fitContext(
         context,
         {
           messages: newMessages,
           systemPrompt: settings.systemPrompt + (settings.responseStyle === 'concise' ? '\nKeep answers brief and practical.' : settings.responseStyle === 'detailed' ? '\nGive thorough explanations with useful examples.' : ''),
-          memoryContextString: settings.memoryEnabled && !turnQuery
+          memoryContextString: settings.memoryEnabled
             ? getMemoryContextString()
             : '',
           currentAttachmentText,
@@ -623,7 +643,7 @@ export function ChatScreen({ navigation, route }: Props) {
           webSources,
         },
         MODEL_CONTEXT_SIZE,
-        turnQuery ? Math.min(settings.maxTokens,256) : settings.maxTokens,
+        settings.maxTokens,
       );
       usedSources = formattedResult.webSources || [];
       setMessages(prev => prev.map(m => m.id === aid ? {...m,sources:usedSources} : m));
@@ -655,7 +675,7 @@ export function ChatScreen({ navigation, route }: Props) {
         data => {
           if (cancelRequested.current) return;
           fullResponse += data.token;
-          const displayContent = fullResponse
+          const displayContent = withoutAction(fullResponse)
             .replace(/<MEMORY>[\s\S]*?(?:<\/MEMORY>|$)/gi, '')
             .trim();
           setMessages(prev =>
@@ -666,11 +686,12 @@ export function ChatScreen({ navigation, route }: Props) {
         },
       );
 
-      if (!cancelRequested.current && settings.memoryEnabled && !turnQuery) {
+      }
+      if (!cloud && !cancelRequested.current && settings.memoryEnabled) {
         const newMemories = parseMemoryActions(fullResponse);
         newMemories.forEach(m => addMemory(m));
       }
-      const savedResponse = fullResponse
+      const savedResponse = withoutAction(fullResponse)
         .replace(/<MEMORY>[\s\S]*?(?:<\/MEMORY>|$)/gi, '')
         .trim();
       const completedMessages: Message[] = savedResponse
@@ -684,7 +705,7 @@ export function ChatScreen({ navigation, route }: Props) {
     } catch (e: any) {
       if (cancelRequested.current) {
         // User requested stop: preserve whatever response was already received, or remove empty assistant placeholder
-        const savedResponse = fullResponse
+        const savedResponse = withoutAction(fullResponse)
           .replace(/<MEMORY>[\s\S]*?(?:<\/MEMORY>|$)/gi, '')
           .trim();
         const completedMessages: Message[] = savedResponse
@@ -698,7 +719,7 @@ export function ChatScreen({ navigation, route }: Props) {
       } else {
         console.error(e);
         Alert.alert(
-          turnQuery ? 'Web answer unavailable' : 'Generation Error',
+          'Generation Error',
           e?.message || 'Failed to generate response.',
         );
         saveConversation(conversationId.current, messages);
@@ -708,20 +729,19 @@ export function ChatScreen({ navigation, route }: Props) {
       }
     } finally {
       generationBusy.current = false;
-      searchAbort.current = null;
+      cloudAbort.current = null;
       if (mounted.current) {
         setIsGenerating(false);
-        setSearching(false);
       }
     }
   };
 
   const stopGeneration = () => {
-    if (llamaRef.current && isGenerating) {
+    if (isGenerating) {
       cancelRequested.current = true;
-      searchAbort.current?.abort();
+      cloudAbort.current?.abort();
       try {
-        const stopRes = llamaRef.current.stopCompletion() as unknown;
+        const stopRes = llamaRef.current?.stopCompletion() as unknown;
         if (stopRes && typeof (stopRes as any).catch === 'function') {
           (stopRes as Promise<any>).catch(() => {});
         }
@@ -742,6 +762,8 @@ export function ChatScreen({ navigation, route }: Props) {
 
   const switchModel = (url: string) => {
     if (generationBusy.current) return;
+    if(!cloud&&url===settings.modelUrl){setShowModelModal(false);return;}
+    selectCloud(null);setCloud(null);
     const newSettings = { ...settings, modelUrl: url };
     setSettings(newSettings);
     saveSettings(newSettings);
@@ -749,7 +771,9 @@ export function ChatScreen({ navigation, route }: Props) {
     setModelReady(false); // trigger download/init flow
   };
 
-  const selected = AVAILABLE_MODELS.find(m => m.url === settings.modelUrl);
+  const selected = MODEL_CATALOG.find(m => m.url === settings.modelUrl);
+  const selectedFits=eligibleModels.some(m=>m.url===settings.modelUrl);
+  const chooseCloud=(selection:CloudSelection)=>{if(generationBusy.current)return;selectCloud(selection);setCloud(selection);setShowModelModal(false);};
   const copy = async (text: string) => {
     try {
       if (!NativeModules.DeviceControl?.copyToClipboard)
@@ -765,14 +789,15 @@ export function ChatScreen({ navigation, route }: Props) {
   };
   return (
     <View style={[ui.screen, { paddingTop: insets.top }]}>
+      <GlassBackdrop/>
       <View style={S.header}>
         <IconButton glyph="☰" label="Open menu" disabled={isGenerating || isDownloading} onPress={() => setDrawer(true)} />
         <View style={[ui.row, ui.flex, {justifyContent: 'center'}]}><MoonMark size={28} /><Text style={S.headerTitle}>Moonlight</Text></View>
         <IconButton glyph="＋" label="Start a new conversation" disabled={isGenerating || isDownloading} onPress={clearChat} />
       </View>
-      {modelReady && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Choose a model" disabled={isGenerating || isDownloading} onPress={() => setShowModelModal(true)} style={{alignSelf:'center', padding:12}}>
-        <Text style={ui.small}>{selected?.name || 'Custom model'} · On device  ⌄</Text>
-      </TouchableOpacity>}
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Choose a model" disabled={isGenerating || isDownloading} onPress={() => setShowModelModal(true)} style={{alignSelf:'center',paddingHorizontal:18,paddingVertical:12,margin:8,borderRadius:24,backgroundColor:Theme.color.surface,maxWidth:'90%'}}>
+        <Text numberOfLines={1} style={ui.small}>{cloud?`${cloud.model} · ${cloud.providerId==='lmstudio'?'Computer':'Cloud'}`: `${selected?.name || 'Custom model'} · On device`}  ⌄</Text>
+      </TouchableOpacity>
       <KeyboardAvoidingView
         style={ui.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -783,39 +808,41 @@ export function ChatScreen({ navigation, route }: Props) {
           data={messages}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={S.messages}
-          onLayout={() => listRef.current?.scrollToEnd({animated:false})}
-          onContentSizeChange={() =>
-            listRef.current?.scrollToEnd({ animated: false })
-          }
+          removeClippedSubviews={false}
+          onLayout={scrollToLatest}
+          onScrollBeginDrag={()=>{followReply.current=false;}}
+          onScroll={({nativeEvent:e})=>{if(e.contentSize.height-e.layoutMeasurement.height-e.contentOffset.y<80)followReply.current=true;}}
+          scrollEventThrottle={32}
+          onContentSizeChange={(_,height)=>{contentHeight.current=height;scrollToLatest();}}
           keyExtractor={item => item.id}
           ListEmptyComponent={
             <View style={S.welcome}>
-              <Text style={S.welcomeTitle}>A little clarity.{'\n'}A lot of possibility.</Text>
-              {modelReady && <Text style={S.welcomeBody}>
-                Big questions, half-formed ideas, everyday things.
+              <Text style={S.welcomeTitle}>{isGlass()?"What’s on\nyour mind?":"A little clarity.\nA lot of possibility."}</Text>
+              {(modelReady||cloud) && <Text style={S.welcomeBody}>
+                A calmer place to think, create, and explore with AI.
               </Text>}
               {isAppBooting ? (
                 <View style={S.loading}>
                   <ActivityIndicator color={C.accent} />
                   <Text style={ui.small}>Preparing your local model</Text>
                 </View>
-              ) : !modelReady ? (
+              ) : !modelReady && !cloud ? (
                 <View style={S.setup}>
                   <Text style={S.setupTitle}>
                     {isDownloading
                       ? 'Downloading your model'
-                      : 'Set up local chat'}
+                      : selectedFits?'Set up local chat':'Choose where to chat'}
                   </Text>
                   <Text style={ui.body}>
                     {isDownloading
                       ? 'Keep writing while it downloads. Keep the app open.'
-                      : 'Download a model once, then chat with it offline. Your phone does the thinking.'}
+                      : selectedFits?'Download a model once, then chat with it offline. Your phone does the thinking.':recommendation||'Checking your phone. You can also connect a computer or cloud provider.'}
                   </Text>
-                  <Text style={S.modelName}>
+                  {(selectedFits||isDownloading)&&<Text style={S.modelName}>
                     {selected?.name || 'Your custom model'}
                     {selected ? ' · ' + selected.size : ''}
-                  </Text>
-                  {selected?.id === recommendedId && <Text style={ui.small}>Suggested for your available device capacity</Text>}
+                  </Text>}
+                  {selectedFits&&selected?.id === recommendedId && <Text style={ui.small}>Suggested for your available device capacity</Text>}
                   {isDownloading && (
                     <View
                       accessibilityRole="progressbar"
@@ -845,7 +872,7 @@ export function ChatScreen({ navigation, route }: Props) {
                     onPress={() =>
                       isDownloading
                         ? handleCancelDownload()
-                        : handleDownload(settings.modelUrl)
+                        : selectedFits?handleDownload(settings.modelUrl):navigation.navigate('Models')
                     }
                   >
                     <Text style={ui.primaryText}>
@@ -853,7 +880,7 @@ export function ChatScreen({ navigation, route }: Props) {
                         ? 'Cancel download · ' +
                           Math.round(downloadProgress) +
                           '%'
-                        : selected?.id === 'moonlight-v7' ? 'Download Moonlight' : 'Download model'}
+                        : selectedFits?'Download model':'Check phone models'}
                     </Text>
                   </TouchableOpacity>
                   {!isDownloading && (
@@ -906,7 +933,7 @@ export function ChatScreen({ navigation, route }: Props) {
                 {item.content ? (
                   <AnswerText content={item.content} />
                 ) : (
-                  <Text style={ui.small}>{searching ? 'Searching the web…' : 'Thinking through your message…'}</Text>
+                  <Text style={ui.small}>{'Thinking through your message…'}</Text>
                 )}
                 {!!item.sources?.length && <View style={{gap:8,marginTop:14}}>
                   <Text style={ui.small}>Search sources · Excerpts may be incomplete</Text>
@@ -956,7 +983,7 @@ export function ChatScreen({ navigation, route }: Props) {
             )
           }
         />
-        {!!messages.length && !modelReady && (
+        {!!messages.length && !modelReady && !cloud && (
           <TouchableOpacity
             accessibilityRole="button"
             style={S.resume}
@@ -998,12 +1025,13 @@ export function ChatScreen({ navigation, route }: Props) {
           </View>
         )}
         <View
-          onLayout={() => listRef.current?.scrollToEnd({animated:false})}
+          onLayout={scrollToLatest}
           style={[
             S.composer,
             { marginBottom: (isKeyboardVisible ? 0 : insets.bottom) + 8 },
           ]}
         >
+          <LunarPulse phase={voiceModeActive?'listening':isGenerating?'replying':null}/>
           <TextInput
             accessibilityLabel="Message"
             value={inputText}
@@ -1021,14 +1049,6 @@ export function ChatScreen({ navigation, route }: Props) {
               disabled={isGenerating}
               onPress={handlePickFile}
             />
-            <TouchableOpacity accessibilityRole="switch" accessibilityState={{checked:webEnabled}} accessibilityLabel="Web search" disabled={isGenerating} style={S.memoryButton} onPress={async () => {
-              if (webEnabled) {setWebEnabled(false);return;}
-              try {await restoreSearchConnection();} catch(error:any) {Alert.alert('Search connection',error.message);return;}
-              if (!getSearchConnection().connected) {Alert.alert('Connect web search','Open Settings → Web search and save the server address and access key supplied by your alpha administrator.',[{text:'Later',style:'cancel'},{text:'Open settings',onPress:()=>navigation.navigate('Settings')}]);return;}
-              setWebEnabled(true);
-            }}>
-              <Text style={[ui.small,webEnabled&&{color:C.accent,fontWeight:'600'}]}>{webEnabled ? '◎ Web on' : '◎ Web off'}</Text>
-            </TouchableOpacity>
             <View style={ui.flex} />
             <IconButton
               glyph="≋"
@@ -1044,7 +1064,7 @@ export function ChatScreen({ navigation, route }: Props) {
               }
               disabled={
                 !isGenerating &&
-                (!modelReady || (!inputText.trim() && !attachedFile))
+                ((!modelReady && !cloud) || (!inputText.trim() && !attachedFile))
               }
               onPress={() =>
                 isGenerating ? stopGeneration() : handleSendMessage()
@@ -1052,7 +1072,7 @@ export function ChatScreen({ navigation, route }: Props) {
               style={[
                 S.send,
                 !isGenerating &&
-                  (!modelReady || (!inputText.trim() && !attachedFile)) &&
+                  ((!modelReady && !cloud) || (!inputText.trim() && !attachedFile)) &&
                   ui.disabled,
               ]}
             >
@@ -1087,8 +1107,15 @@ export function ChatScreen({ navigation, route }: Props) {
             <Text style={ui.body}>
               {recommendation || 'Models run locally after download. Larger models need more memory.'}
             </Text>
+            <TextInput accessibilityLabel="Search models" placeholder="Search models…" placeholderTextColor={C.textMuted} value={modelSearch} onChangeText={setModelSearch} style={[ui.input,{marginVertical:12}]}/>
+            <View style={[ui.row,{marginBottom:12}]}>{(['device','computer','cloud'] as const).map(tab=><TouchableOpacity key={tab} accessibilityRole="tab" accessibilityState={{selected:modelTab===tab}} onPress={()=>{setModelTab(tab);if(tab==='device')void getDeviceRecommendation().then(r=>{setEligibleModels(r.models);setRecommendation(r.reason);});}} style={{flex:1,minHeight:48,alignItems:'center',justifyContent:'center',borderRadius:24,backgroundColor:modelTab===tab?Theme.color.primary:Theme.color.surfaceRaised}}><Text style={{color:modelTab===tab?Theme.onPrimary:C.textPrimary}}>{tab==='device'?'Phone':tab==='computer'?'Computer':'Cloud'}</Text></TouchableOpacity>)}</View>
             <ScrollView>
-              {[...AVAILABLE_MODELS].sort((a,b) => Number(b.id === recommendedId) - Number(a.id === recommendedId)).map(model => (
+              {modelTab!=='device'&&<>
+                {!listProviders().length&&<Text style={[ui.body,{padding:16}]}>Connect a provider to use cloud models. No model download is needed.</Text>}
+                {modelTab==='computer'&&!listProviders().some(p=>p.connectionType==='lmstudio')&&<Text style={[ui.body,{paddingVertical:16}]}>Connect LM Studio to chat with models on your computer. No phone download is needed.</Text>}
+                {listProviders().filter(p=>modelTab==='computer'?p.connectionType==='lmstudio':p.connectionType!=='lmstudio').map(provider=><View key={provider.id} style={{marginBottom:16}}><Text style={ui.section}>{provider.name}</Text>{!provider.models.length&&<Text style={ui.small}>Load models in connection settings.</Text>}{provider.models.filter(model=>model.toLowerCase().includes(modelSearch.toLowerCase())).map(model=><TouchableOpacity key={model} accessibilityRole="radio" accessibilityState={{checked:cloud?.providerId===provider.id&&cloud.model===model}} style={S.modelOption} onPress={()=>chooseCloud({providerId:provider.id,model})}><Text style={[ui.body,ui.flex]}>{model}</Text><Text style={ui.small}>{cloud?.providerId===provider.id&&cloud.model===model?'✓':'›'}</Text></TouchableOpacity>)}</View>)}
+              </>}
+              {modelTab==='device'&&eligibleModels.filter(model=>model.name.toLowerCase().includes(modelSearch.toLowerCase())).sort((a,b) => Number(b.id === recommendedId) - Number(a.id === recommendedId)).map(model => (
                 <TouchableOpacity
                   accessibilityRole="radio"
                   accessibilityState={{
@@ -1115,10 +1142,10 @@ export function ChatScreen({ navigation, route }: Props) {
               style={S.textButton}
               onPress={() => {
                 setShowModelModal(false);
-                navigation.navigate('Settings');
+                navigation.navigate(modelTab==='computer'?'LMStudio':modelTab==='cloud'?'Providers':'Models');
               }}
             >
-              <Text style={S.link}>Use a custom model URL</Text>
+              <Text style={S.link}>{modelTab==='computer'?'Connect / manage LM Studio':modelTab==='cloud'?'Manage providers':'Manage downloaded models'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1134,7 +1161,7 @@ const S = themedStyles(() => ({
   },
   reportSheet: {
     maxHeight: '88%',
-    backgroundColor: C.surface,
+    backgroundColor: isGlass()?(isDark()?'#142B47':'#F0F7FF'):C.surface,
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
     padding: 18,
@@ -1216,6 +1243,10 @@ const S = themedStyles(() => ({
   reportFailure: { color: C.red, marginTop: 14, lineHeight: 19 },
 
   header: {
+    backgroundColor:C.surface,
+    marginHorizontal:14,
+    marginTop:8,
+    borderRadius:24,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
@@ -1228,11 +1259,11 @@ const S = themedStyles(() => ({
   chevron: { color: C.textMuted },
   status: { color: C.textMuted, fontSize: 11, marginTop: 4 },
   messages: { padding: 22, paddingBottom: 30, flexGrow: 1 },
-  welcome: { alignItems: 'center', paddingTop: 8, gap: 12 },
+  welcome: { alignItems: 'center', paddingTop: 36, gap: 16 },
   welcomeTitle: {
     fontFamily: Theme.headingFont,
     fontSize: 29,
-    fontWeight: '500',
+    fontWeight: '600',
     letterSpacing: -1,
     color: C.textPrimary,
     textAlign: 'center',
@@ -1272,6 +1303,7 @@ const S = themedStyles(() => ({
   progressFill: { height: '100%', backgroundColor: C.accent },
   starters: { alignSelf: 'stretch', gap: 10, marginTop: 12 },
   starter: {
+    backgroundColor:C.surface,
     borderColor: C.border,
     borderWidth: 1,
     borderRadius: 16,
@@ -1289,7 +1321,7 @@ const S = themedStyles(() => ({
     lineHeight: 24,
     overflow: 'hidden',
   },
-  answer: { marginBottom: 30 },
+  answer: { marginBottom: 30,backgroundColor:isGlass()?C.surface:undefined,padding:isGlass()?16:0,borderRadius:24 },
   answerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1336,7 +1368,7 @@ const S = themedStyles(() => ({
     justifyContent: 'center',
     marginRight: 4,
   },
-  sendText: { color: C.bg, fontSize: 25, fontWeight: '600' },
+  sendText: { color: Theme.onPrimary, fontSize: 25, fontWeight: '600' },
   notice: {
     color: C.textMuted,
     paddingHorizontal: 22,
@@ -1354,7 +1386,7 @@ const S = themedStyles(() => ({
   },
   resume: { padding: 16, alignItems: 'center' },
   sheet: {
-    backgroundColor: C.surface,
+    backgroundColor: isGlass()?(isDark()?'#142B47':'#F0F7FF'):C.surface,
     padding: 22,
     gap: 14,
     maxHeight: '85%',
@@ -1374,3 +1406,6 @@ const S = themedStyles(() => ({
     borderBottomColor: C.border,
   },
 }));
+
+
+

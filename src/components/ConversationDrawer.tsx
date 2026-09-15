@@ -4,6 +4,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Theme, useAppearance} from '../constants/theme';
 import {Conversation, deleteConversation, listConversations, renameConversation} from '../services/conversations';
 import {IconButton, MoonMark, ui} from './Design';
+import {GlassBackdrop} from './GlassBackdrop';
 
 export function ConversationDrawer({visible,onClose,onNew,onOpen,onNavigate,onDeleted}: {
   visible:boolean; onClose:()=>void; onNew:()=>void; onOpen:(c:Conversation)=>void;
@@ -24,8 +25,8 @@ export function ConversationDrawer({visible,onClose,onNew,onOpen,onNavigate,onDe
   ]);
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
     <View style={{flex:1,flexDirection:'row',backgroundColor:'#0007'}}>
-      <View style={{width:'87%',maxWidth:420,backgroundColor:c.background,padding:20,paddingTop:insets.top+12,paddingBottom:insets.bottom+12}}>
-        <View style={ui.row}><MoonMark size={30}/><Text style={[ui.section,ui.flex,{marginTop:0,fontFamily:'serif'}]}>Moonlight</Text><IconButton glyph="×" label="Close menu" onPress={onClose}/></View>
+      <View style={{width:'87%',maxWidth:420,backgroundColor:c.background,padding:20,paddingTop:insets.top+12,paddingBottom:insets.bottom+12,borderTopRightRadius:32,borderBottomRightRadius:32,overflow:'hidden'}}><GlassBackdrop/>
+        <View style={ui.row}><MoonMark size={30}/><Text style={[ui.section,ui.flex,{marginTop:0,fontFamily:Theme.headingFont}]}>Moonlight</Text><IconButton glyph="×" label="Close menu" onPress={onClose}/></View>
         <TouchableOpacity style={[ui.primary,{marginVertical:16}]} onPress={onNew} accessibilityRole="button"><Text style={ui.primaryText}>＋ New chat</Text></TouchableOpacity>
         <TextInput accessibilityLabel="Search conversations" value={query} onChangeText={setQuery} placeholder="Search conversations" placeholderTextColor={c.textMuted} style={ui.input}/>
         <Text style={[ui.small,{marginTop:24,marginBottom:8}]}>RECENT</Text>

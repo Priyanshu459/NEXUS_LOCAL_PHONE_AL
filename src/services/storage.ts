@@ -1,5 +1,5 @@
 import { createMMKV } from 'react-native-mmkv';
-import {MODEL_CATALOG} from '../constants/models';
+import {MODEL_CATALOG, AVAILABLE_MODELS} from '../constants/models';
 
 export const storage = createMMKV({
   id: 'moon-studio-storage',
@@ -26,7 +26,7 @@ export const defaultSettings: AppSettings = {
   top_p: 0.9,
   top_k: 40,
   maxTokens: 512,
-  modelUrl: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+  modelUrl: AVAILABLE_MODELS[0].url,
   memoryEnabled: true,
 };
 
