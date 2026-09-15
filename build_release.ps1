@@ -27,9 +27,21 @@ try {
     Write-Host "`nCredentials loaded into memory securely." -ForegroundColor Green
     Write-Host "Building the release Android App Bundle (AAB) for Moonlight 1.6.1 (code 17)..." -ForegroundColor Cyan
 
+    $buildArgs = @('bundleRelease')
+    $nativeLibsDir = Join-Path $PSScriptRoot "android\app\build\intermediates\stripped_native_libs\release"
+    if (Test-Path $nativeLibsDir) {
+        Write-Host "Reusing pre-compiled native C++ binaries (bypasses Windows Ninja MAX_PATH limitation)..." -ForegroundColor Cyan
+        foreach ($module in @('app', 'llama.rn', 'react-native-mmkv', 'react-native-nitro-modules', 'react-native-screens')) {
+            $buildArgs += @('-x', ":${module}:buildCMakeRelWithDebInfo[arm64-v8a]")
+            $buildArgs += @('-x', ":${module}:buildCMakeRelWithDebInfo[armeabi-v7a]")
+            $buildArgs += @('-x', ":${module}:buildCMakeRelWithDebInfo[x86]")
+            $buildArgs += @('-x', ":${module}:buildCMakeRelWithDebInfo[x86_64]")
+        }
+    }
+
     Push-Location (Join-Path $PSScriptRoot "android")
     try {
-        .\gradlew.bat bundleRelease
+        .\gradlew.bat @buildArgs
     } finally {
         Pop-Location
     }
