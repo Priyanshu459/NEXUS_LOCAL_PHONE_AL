@@ -61,7 +61,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.updated}>Effective date: September 14, 2026</Text>
+        <Text style={styles.updated}>Effective date: September 17, 2026</Text>
         <Text style={styles.heading}>LM Studio connections</Text>
         <Text style={styles.body}>Connecting LM Studio sends the selected conversation and instructions to your configured computer server. That server can route models through its own LM Link. Moonlight does not join LM Link directly. Server tokens are encrypted in Android Keystore. Private-IP HTTP requires opting in and is not encrypted by Moonlight; use a trusted network, a VPN, or HTTPS. Public HTTP destinations and redirects are blocked by the provider transport.</Text>
         <Text style={styles.heading}>Local data</Text>
@@ -72,7 +72,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           or analytics SDKs. Optional cloud inference is described below.
         </Text>
         <Text style={styles.heading}>Network activity</Text>
-        <Text style={styles.body}>When you choose a cloud model, Moonlight asks before sending a conversation to that provider. Up to 20 recent messages, your personal instructions, approved text attachments and search excerpts are sent for the answer. Saved memories are not included. The provider processes this data under its own policies and may charge for API usage. Provider keys and endpoint details are encrypted using Android Keystore; removal in AI providers deletes the saved credential. No keys are embedded in the app.</Text>
+        <Text style={styles.body}>When you choose a cloud model, Moonlight asks before sending a conversation to that provider. Up to 20 recent messages, your personal instructions, approved text attachments and search excerpts are sent for the answer. Saved memories are not included. The provider processes this data under its own policies and may charge for API usage. Provider keys are encrypted with keys held in Android Keystore; removal in AI providers deletes the saved credential. Connection metadata, chats and memories use application-private storage without additional app-level encryption. No API keys are embedded in the app.</Text>
         <Text style={styles.body}>
           Moonlight AI connects to Hugging Face to resolve and download models
           you choose. Hugging Face receives normal network information such as

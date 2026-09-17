@@ -4,7 +4,12 @@ import java.net.URL
 
 internal object ProviderEndpointPolicy {
   fun validate(raw: String, studio: Boolean, allowHttp: Boolean) {
+    require(raw.length in 1..2048 && raw.none { it <= ' ' || it == '\u007f' || it == '\\' })
     val base = URL(raw)
+    require(base.toURI().host != null && (base.port == -1 || base.port in 1..65535))
+    val host = base.host.lowercase().trimEnd('.')
+    require(host != "localhost" && !host.endsWith(".localhost") && host != "[::1]" && host != "::1")
+    require(!host.startsWith("127.") && !host.startsWith("169.254.") && host != "0.0.0.0")
     require(base.userInfo == null && base.query == null && base.ref == null)
     if(studio) {
       require(base.path.trimEnd('/') == "/v1")

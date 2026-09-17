@@ -9,13 +9,15 @@ import java.net.URLEncoder
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
 
 /** Credentials and credential-bearing networking stay in native code. No redirects. */
 class ProviderClient(private val context: Context) {
   private val executor = Executors.newFixedThreadPool(2)
-  private data class Request(val cancelled: AtomicBoolean = AtomicBoolean(false), var connection: HttpURLConnection? = null)
+  private val deadlines = Executors.newSingleThreadScheduledExecutor()
+  private data class Request(val cancelled: AtomicBoolean = AtomicBoolean(false), @Volatile var connection: HttpURLConnection? = null)
   private val requests = ConcurrentHashMap<String, Request>()
   private fun vault(id: String): SearchCredentialStore {
     require(id.matches(Regex("[a-zA-Z0-9_-]{1,60}")))
@@ -57,9 +59,20 @@ class ProviderClient(private val context: Context) {
   fun cancel(requestId: String) { requests[requestId]?.let { it.cancelled.set(true); it.connection?.disconnect() } }
   fun request(requestId: String, id: String, operation: String, model: String, body: String, promise: Promise) {
     val work = Request()
-    if (requests.size >= 2 || requests.putIfAbsent(requestId, work) != null) {
+    val admitted = synchronized(requests) {
+      if (requestId.length !in 1..100 || requests.size >= 2 || requests.containsKey(requestId)) false
+      else { requests[requestId] = work; true }
+    }
+    if (!admitted) {
       promise.reject("PROVIDER_BUSY", "Another request is running. Try again shortly."); return
     }
+    // A slow-drip server must not occupy a worker indefinitely by resetting read timeouts.
+    val expired = AtomicBoolean(false)
+    val deadline = deadlines.schedule({
+      expired.set(true)
+      work.cancelled.set(true)
+      work.connection?.disconnect()
+    }, if (operation == "models") 30L else 75L, TimeUnit.SECONDS)
     executor.execute {
       try {
         require(operation in listOf("models", "chat", "responses"))
@@ -142,8 +155,8 @@ class ProviderClient(private val context: Context) {
           is javax.net.ssl.SSLException -> "HTTPS certificate verification failed. Use the exact HTTPS address from your secure tunnel; self-signed certificates are not accepted."
           else -> "Could not reach the server. Check the address, server status, firewall and Wi-Fi or VPN connection."
         }
-        promise.reject("PROVIDER_REQUEST", if(work.cancelled.get()) "Request cancelled." else detail)
-      } finally { work.connection?.disconnect(); requests.remove(requestId) }
+        promise.reject("PROVIDER_REQUEST", if(expired.get()) "Server exceeded the request time limit. Try again or choose a faster model." else if(work.cancelled.get()) "Request cancelled." else detail)
+      } finally { deadline.cancel(false); work.connection?.disconnect(); requests.remove(requestId) }
     }
   }
 }

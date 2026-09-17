@@ -10,6 +10,7 @@ import {validateGgufDownloadUrl} from '../services/modelManager';
 import {clearConversations} from '../services/conversations';
 import {MoonMark} from '../components/Design';
 import {SettingsIcon} from '../components/SettingsIcon';
+import {SoftwareNotices} from '../components/SoftwareNotices';
 
 const sections = [
   ['AI providers','Your API keys & cloud models'],
@@ -99,8 +100,9 @@ export function SettingsScreen({navigation}: any) {
           {key:'maxTokens',label:'Response token limit',help:'Maximum new tokens per answer.',step:128,min:64,max:2048}] as const).map(item=><View key={item.key} style={ui.row}><View style={ui.flex}><Text style={ui.body}>{item.label}</Text><Text style={ui.small}>{item.help}</Text></View><IconButton glyph="−" label={`Decrease ${item.label}`} onPress={()=>update({[item.key]:Math.max(item.min,Number((settings[item.key]-item.step).toFixed(2)))})}/><Text style={ui.body}>{settings[item.key]}</Text><IconButton glyph="＋" label={`Increase ${item.label}`} onPress={()=>update({[item.key]:Math.min(item.max,Number((settings[item.key]+item.step).toFixed(2)))})}/></View>)}
       </>}
       {panel==='About & help'&&<>
-        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.6.1 · Glass alpha</Text>
+        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.6.2 · Glass alpha</Text>
         {row('Model licenses & attribution','',()=>navigation.navigate('ModelAttribution'))}
+        {row('Software licenses','Open-source notices',()=>setPanel('Software licenses'))}
         {row('Privacy policy','',()=>navigation.navigate('PrivacyPolicy'))}
         <Text style={ui.section}>Download failed?</Text><Text style={ui.body}>Check your connection and available storage, then retry. Keep the app open during large downloads.</Text>
         <Text style={ui.section}>Slow or failed responses?</Text><Text style={ui.body}>Try a smaller model, close other apps, or shorten the conversation. Device recommendations are estimates, not speed guarantees.</Text>
@@ -108,9 +110,11 @@ export function SettingsScreen({navigation}: any) {
         {button('Reset response preferences',()=>Alert.alert('Reset preferences?','Chats, memories, models and appearance are kept.',[{text:'Cancel',style:'cancel'},{text:'Reset',onPress:()=>{update({...defaultSettings,modelUrl:getSettings().modelUrl});setPrompt(defaultSettings.systemPrompt);setStatus('Response preferences reset.');}}]))}
       </>}
       {!!status&&<Text accessibilityLiveRegion="polite" style={ui.body}>{status}</Text>}
+      {panel==='Software licenses'&&<SoftwareNotices/>}
     </ScrollView>
   </View>;
 }
+
 
 
 

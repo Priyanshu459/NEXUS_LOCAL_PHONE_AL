@@ -36,6 +36,7 @@ import {
   cancelDownload,
 } from '../services/modelManager';
 import { initLlama, LlamaContext } from 'llama.rn';
+import {createReplyUpdates} from '../services/replyUpdates';
 import {checkLoadCapacity, serializeModelLoad} from '../services/modelLoadGuard';
 import {sanitizeSources, WebSource} from '../services/webSearch';
 import {
@@ -620,6 +621,11 @@ export function ChatScreen({ navigation, route }: Props) {
 
     let fullResponse = '';
     let usedSources: WebSource[] = [];
+    const replyUpdates = createReplyUpdates(() => {
+      if (!mounted.current || cancelRequested.current) return;
+      const content = withoutAction(fullResponse).replace(/<MEMORY>[\s\S]*?(?:<\/MEMORY>|$)/gi, '').trim();
+      setMessages(previous => previous.map(message => message.id === aid ? {...message, content} : message));
+    });
     try {
       let webSources: WebSource[] | undefined;
       if(cloud){
@@ -675,14 +681,7 @@ export function ChatScreen({ navigation, route }: Props) {
         data => {
           if (cancelRequested.current) return;
           fullResponse += data.token;
-          const displayContent = withoutAction(fullResponse)
-            .replace(/<MEMORY>[\s\S]*?(?:<\/MEMORY>|$)/gi, '')
-            .trim();
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === aid ? { ...m, content: displayContent } : m,
-            ),
-          );
+          replyUpdates.schedule();
         },
       );
 
@@ -728,6 +727,7 @@ export function ChatScreen({ navigation, route }: Props) {
         setAttachedFile(attachedFile);
       }
     } finally {
+      replyUpdates.dispose();
       generationBusy.current = false;
       cloudAbort.current = null;
       if (mounted.current) {
@@ -809,6 +809,9 @@ export function ChatScreen({ navigation, route }: Props) {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={S.messages}
           removeClippedSubviews={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={6}
+          windowSize={7}
           onLayout={scrollToLatest}
           onScrollBeginDrag={()=>{followReply.current=false;}}
           onScroll={({nativeEvent:e})=>{if(e.contentSize.height-e.layoutMeasurement.height-e.contentOffset.y<80)followReply.current=true;}}

@@ -87,3 +87,6 @@ yarn-error.log
 
 # Graphify knowledge graph outputs
 graphify-out/
+
+# Local release build script
+build_release.ps1
