@@ -78,6 +78,8 @@ class DeviceControlModule(
     }
   }
   private var filePromise: Promise? = null
+  private val fileReading = AtomicBoolean(false)
+  private val fileExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
   private data class SearchRequest(val connection: HttpsURLConnection, val cancelled: AtomicBoolean = AtomicBoolean(false))
   private val searches = ConcurrentHashMap<String, SearchRequest>()
 
@@ -234,7 +236,7 @@ class DeviceControlModule(
       promise.reject("NO_ACTIVITY", "The file picker is unavailable because the app is not active.")
       return
     }
-    if (filePromise != null) {
+    if (filePromise != null || fileReading.get()) {
       promise.reject("REQUEST_IN_PROGRESS", "The file picker is already active.")
       return
     }
@@ -268,10 +270,11 @@ class DeviceControlModule(
       return
     }
 
-    try {
-      promise.resolve(readSelectedFile(activity, data.data!!))
-    } catch (error: Exception) {
-      promise.reject("READ_ERROR", "Failed to read the selected file.", error)
+    fileReading.set(true)
+    fileExecutor.execute {
+      try { promise.resolve(readSelectedFile(activity, data.data!!)) }
+      catch (error: Exception) { promise.reject("READ_ERROR", if(error is IllegalArgumentException || error is IllegalStateException) error.message ?: "Unsupported media." else "Could not read this file. Try a smaller image or short video.") }
+      finally { fileReading.set(false) }
     }
   }
 
@@ -292,10 +295,20 @@ class DeviceControlModule(
 
       val sizeLabel = if (sizeBytes > 1024) "${sizeBytes / 1024} KB" else "$sizeBytes B"
       val lowerName = displayName.lowercase(Locale.ROOT)
+      val detectedMime = activity.contentResolver.getType(uri).orEmpty()
+      val mime = if(detectedMime.isEmpty() || detectedMime == "application/octet-stream") when {
+        listOf(".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif").any(lowerName::endsWith) -> "image/*"
+        listOf(".mp4", ".webm", ".mov", ".mkv").any(lowerName::endsWith) -> "video/*"
+        else -> detectedMime
+      } else detectedMime
+      if (mime.startsWith("image/") || mime.startsWith("video/")) {
+        merge(VisionAttachmentReader.read(activity, uri, mime, displayName))
+        return@apply
+      }
       val binaryExtensions = listOf(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".pdf", ".zip")
       val content = when {
         binaryExtensions.any(lowerName::endsWith) ->
-          "[Attached File: $displayName ($sizeLabel)]\nThis binary file cannot be read by the local text-only model. Paste any relevant text into the chat."
+          throw IllegalArgumentException("This file format is not supported. Choose an image, a short video, or plain text.")
         sizeBytes > MAX_TEXT_FILE_BYTES ->
           "[Attached File: $displayName ($sizeLabel)]\nThis file is larger than the 512 KB text attachment limit. Paste a smaller excerpt into the chat."
         else -> readTextContent(activity, uri)
@@ -329,6 +342,7 @@ class DeviceControlModule(
   }
 
   override fun invalidate() {
+    fileExecutor.shutdownNow()
     appContext.removeActivityEventListener(activityEventListener)
     speechPromise?.reject("MODULE_DESTROYED", "Voice input stopped because the app closed.")
     filePromise?.reject("MODULE_DESTROYED", "File selection stopped because the app closed.")

@@ -90,8 +90,8 @@ android {
         applicationId "com.moonknightstudio.moonlightai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 18
-        versionName "1.6.2"
+        versionCode 19
+        versionName "1.7.0"
         if (project.hasProperty('moonlightPreview')) {
             applicationIdSuffix ".preview"
             versionNameSuffix "-preview"
@@ -158,6 +158,7 @@ dependencies {
         implementation jscFlavor
     }
 }
+
 
 
 

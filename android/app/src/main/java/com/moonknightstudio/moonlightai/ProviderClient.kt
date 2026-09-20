@@ -76,8 +76,9 @@ class ProviderClient(private val context: Context) {
     executor.execute {
       try {
         require(operation in listOf("models", "chat", "responses"))
-        require(body.toByteArray(Charsets.UTF_8).size <= 131072 && model.length <= 200)
         val config = validate(JSONObject(vault(id).read() ?: throw IllegalStateException()))
+        val bodyLimit = if(operation == "chat" || operation == "responses") 1572864 else 131072
+        require(body.toByteArray(Charsets.UTF_8).size <= bodyLimit && model.length <= 200)
         val base = config.getString("baseUrl").trimEnd('/')
         // NVIDIA's hosted API has one supported wire format, regardless of model vendor.
         // Repair old saved choices without decrypting credentials into JavaScript.
@@ -135,6 +136,7 @@ class ProviderClient(private val context: Context) {
             bytes.toString("UTF-8").lowercase()
           } ?: ""
           val category = when {
+            error.contains("vision") || error.contains("image") || error.contains("mmproj") || error.contains("multimodal") -> "vision"
             error.contains("system role") || error.contains("roles must") || error.contains("alternate") || error.contains("system message") -> "roles"
             error.contains("context length") || error.contains("context window") -> "context"
             error.contains("max_tokens") || error.contains("max_completion_tokens") -> "tokens"

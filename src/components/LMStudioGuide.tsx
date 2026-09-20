@@ -6,7 +6,7 @@ import {ui} from './Design';
 export function LMStudioGuide({mode}:{mode:'local'|'remote'}) {
   const [open,setOpen]=useState(false);
   const steps=mode==='local'?[
-    '1. On your computer, open LM Studio and load a text/chat model.',
+    '1. On your computer, open LM Studio and load a chat model. For images, load a vision model such as LFM2.5-VL with its matching vision projector and a compatible runtime.',
     '2. Open Developer → server settings, enable Serve on Local Network and start the server. Note its network address and port, usually 1234.',
     '3. Enable API authentication and create an LM Studio token. Keep your computer awake.',
     '4. Connect your phone to the same Wi-Fi. Allow LM Studio through the computer firewall on your private network. Guest Wi-Fi can block device-to-device access.',

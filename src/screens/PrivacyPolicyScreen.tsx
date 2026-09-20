@@ -80,6 +80,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           policy.
         </Text>
         <Text style={styles.heading}>Documents and speech</Text>
+        <Text style={styles.body}>For vision models, selected images are resized and converted to JPEG; short videos are represented by four sampled frames without audio. These are sent only after you confirm the selected provider. Media pixels are not stored in chat history. Temporary processing files are deleted after preparation; reattach media for follow-up questions. Resizing can remove fine detail.</Text>
         <Text style={styles.body}>Supported OpenAI and Anthropic cloud models can automatically use provider web search. The provider processes conversation context and generated search queries under its policies; tool fees may apply. Source links are saved with the answer. Opening a source contacts its website. The old alpha search-server connection and Agent mode have been removed. There is no Gmail connection.</Text>
         <Text style={styles.body}>
           The Android system document picker grants access only to a document

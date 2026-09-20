@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Alert,
   FlatList,
   Keyboard,
@@ -37,6 +38,7 @@ import {
 } from '../services/modelManager';
 import { initLlama, LlamaContext } from 'llama.rn';
 import {createReplyUpdates} from '../services/replyUpdates';
+import {VisionAttachment} from '../services/visionAttachments';
 import {checkLoadCapacity, serializeModelLoad} from '../services/modelLoadGuard';
 import {sanitizeSources, WebSource} from '../services/webSearch';
 import {
@@ -353,19 +355,25 @@ export function ChatScreen({ navigation, route }: Props) {
     size: string;
     content: string;
     uri: string;
+    kind?: 'image'|'video';
+    frames?: VisionAttachment['frames'];
+    durationSeconds?: number;
   } | null>(null);
+  const [readingFile,setReadingFile]=useState(false);
 
   const handlePickFile = async () => {
+    if(readingFile)return;
+    setReadingFile(true);
     try {
       const file = await NativeModules.DeviceControl.pickFile();
-      if (file && file.content) {
+      if (mounted.current && file && (file.content || file.frames?.length)) {
         setAttachedFile(file);
       }
     } catch (e: any) {
       if (e?.message && !e.message.includes('cancelled')) {
         Alert.alert('File Attachment Error', e.message);
       }
-    }
+    } finally {if(mounted.current)setReadingFile(false);}
   };
 
   const llamaRef = useRef<LlamaContext | null>(null);
@@ -582,14 +590,16 @@ export function ChatScreen({ navigation, route }: Props) {
     ).trim();
     if (
       (!rawInput && !attachedFile) ||
+      readingFile ||
       generationBusy.current ||
       (!llamaRef.current && !cloud)
     )
       return;
     const consentKey=`${conversationId.current}:${cloud?.providerId}:${cloud?.model}`;
+    if(attachedFile?.kind&&!cloud){Alert.alert('Select a vision model','Image and video-frame analysis requires a vision-capable model in LM Studio or a cloud provider. The phone models currently available here are text-only. Your attachment is kept.');return;}
     if(cloud && !approvedCloud && (cloudConsent.current!==consentKey || attachedFile)){
       const provider=listProviders().find(p=>p.id===cloud.providerId);
-      Alert.alert(`Send to ${provider?.name||'cloud provider'}?`,provider?.connectionType==='lmstudio'?'This sends up to 20 recent messages, your personal instructions and attached text to your LM Studio server. Saved memories stay on this phone. Your server may route requests to a linked computer. Private-network HTTP is unencrypted unless protected by your VPN.':'This sends up to 20 recent messages, your personal instructions and any attached text to this provider. Saved memories stay local. Supported models may use provider web search and send queries to search services. Provider and tool charges may apply.',[{text:'Cancel',style:'cancel'},{text:'Send',onPress:()=>{cloudConsent.current=consentKey;void handleSendMessage(textOverride,historyOverride,true);}}]);return;
+      Alert.alert(`Send to ${provider?.name||'cloud provider'}?`,(attachedFile?.kind?`This sends ${attachedFile.kind==='video'?'four sampled video frames (no audio)':'a resized image'} to the selected model. Media is not saved in chat history; reattach it for follow-up analysis. `:'')+(provider?.connectionType==='lmstudio'?'This sends up to 20 recent messages, your personal instructions and attached text to your LM Studio server. Saved memories stay on this phone. Your server may route requests to a linked computer. Private-network HTTP is unencrypted unless protected by your VPN.':'This sends up to 20 recent messages, your personal instructions and any attached text to this provider. Saved memories stay local. Supported models may use provider web search and send queries to search services. Provider and tool charges may apply.'),[{text:'Cancel',style:'cancel'},{text:'Send',onPress:()=>{cloudConsent.current=consentKey;void handleSendMessage(textOverride,historyOverride,true);}}]);return;
     }
     generationBusy.current = true;
     cancelRequested.current = false;
@@ -598,7 +608,7 @@ export function ChatScreen({ navigation, route }: Props) {
     let displayInput = rawInput;
     if (attachedFile) {
       displayInput = `📄 ${attachedFile.name}\n\n${
-        rawInput || 'Please analyze this document.'
+        rawInput || (attachedFile.kind==='video'?'Describe the sampled video frames.':attachedFile.kind==='image'?'Describe this image.':'Please analyze this document.')
       }`;
     }
 
@@ -607,7 +617,8 @@ export function ChatScreen({ navigation, route }: Props) {
       role: 'user',
       content: displayInput,
     };
-    const currentAttachmentText = attachedFile
+    const currentMedia:VisionAttachment|undefined=attachedFile?.kind?{kind:attachedFile.kind,frames:attachedFile.frames||[],durationSeconds:attachedFile.durationSeconds}:undefined;
+    const currentAttachmentText = attachedFile && !attachedFile.kind
       ? attachedFile.content
       : undefined;
 
@@ -631,7 +642,7 @@ export function ChatScreen({ navigation, route }: Props) {
       if(cloud){
         cloudAbort.current=new AbortController();
         const cloudMessages=newMessages.map((m,i)=>i===newMessages.length-1 && currentAttachmentText?{...m,content:m.content+'\n\nAttached text:\n'+currentAttachmentText}:m);
-        fullResponse=await completeCloud(cloud,cloudMessages,settings.systemPrompt,settings.maxTokens,undefined,cloudAbort.current.signal,sources=>{usedSources=sources;});
+        fullResponse=await completeCloud(cloud,cloudMessages,settings.systemPrompt,settings.maxTokens,undefined,cloudAbort.current.signal,sources=>{usedSources=sources;},currentMedia);
 
         if(cancelRequested.current || !mounted.current)throw new Error('Request cancelled.');
       }else{
@@ -1012,13 +1023,15 @@ export function ChatScreen({ navigation, route }: Props) {
         )}
         {!!attachedFile && (
           <View style={S.attachment}>
+            {attachedFile.frames?.[0]&&<Image accessibilityLabel="Selected media preview" source={{uri:attachedFile.frames[0].dataUrl}} style={{width:48,height:48,borderRadius:10}}/>}
             <View style={ui.flex}>
               <Text numberOfLines={1} style={S.modelName}>
                 {attachedFile.name}
               </Text>
               <Text style={ui.small}>
-                Text attachment · {attachedFile.size}
+                {attachedFile.kind==='video'?'Video analysis':attachedFile.kind==='image'?'Image analysis':'Text attachment'} · {attachedFile.size}
               </Text>
+              {!!attachedFile.kind&&<Text style={ui.small}>Needs a vision model · Reattach for follow-ups</Text>}
             </View>
             <IconButton
               glyph="×"
@@ -1035,6 +1048,7 @@ export function ChatScreen({ navigation, route }: Props) {
           ]}
         >
           <LunarPulse phase={voiceModeActive?'listening':isGenerating?'replying':null}/>
+          {readingFile&&<Text accessibilityLiveRegion="polite" style={ui.small}>Preparing attachment…</Text>}
           <TextInput
             accessibilityLabel="Message"
             value={inputText}
@@ -1048,8 +1062,8 @@ export function ChatScreen({ navigation, route }: Props) {
           <View style={S.composerTools}>
             <IconButton
               glyph="＋"
-              label="Attach a text file"
-              disabled={isGenerating}
+              label={readingFile?'Preparing attachment':'Attach image, video or text'}
+              disabled={isGenerating||readingFile}
               onPress={handlePickFile}
             />
             <View style={ui.flex} />

@@ -2,6 +2,7 @@ import {NativeModules} from 'react-native';
 import {storage, PersistedMessage} from './storage';
 import {safeWebUrl, sourceEvidence, WebSource} from './webSearch';
 import {normalizeStudioUrl} from './lmStudio';
+import {VisionAttachment,visionParts} from './visionAttachments';
 
 export type ApiFormat = 'openai'|'anthropic'|'gemini';
 export interface Provider {id:string; name:string; baseUrl:string; format:ApiFormat; models:string[]; verified?:boolean; webTools?:boolean; connectionType?:'lmstudio'; allowLocalHttp?:boolean}
@@ -73,7 +74,7 @@ async function request(provider:Provider,operation:'models'|'chat'|'responses',m
     if(result.status===429)throw new Error('Provider limit reached. Check your API allowance or retry later.');
     if(result.status===404)throw new Error(`${provider.name}: HTTP 404. ${result.errorCategory==='deployment'?'NVIDIA reported a missing inference deployment.':result.errorCategory==='model'?'The provider reported an unavailable model.':'The server did not find the requested model or route.'} Refresh models in AI providers. Model: ${model||'model catalog'}.${result.route==='NVIDIA POST /v1/chat/completions'?' Route: NVIDIA POST /v1/chat/completions.':''}`);
     if(result.status===400 || result.status===422){
-      const hints:Record<string,string>={roles:'This model rejected the conversation roles.',context:'The conversation exceeds this model’s context limit. Start a new chat.',model:'This model is unavailable or does not support chat. Refresh models and choose a chat model.',tokens:'This model rejected the response token limit. Lower it in Settings → Advanced.'};
+      const hints:Record<string,string>={vision:'This model or runtime rejected image input. Choose a vision-capable model. In LM Studio, load its matching vision projector and update the runtime if needed.',roles:'This model rejected the conversation roles.',context:'The conversation exceeds this model’s context limit. Start a new chat.',model:'This model is unavailable or does not support chat. Refresh models and choose a chat model.',tokens:'This model rejected the response token limit. Lower it in Settings → Advanced.'};
       throw new Error(`${provider.name} (HTTP ${result.status}): ${hints[result.errorCategory]||'The provider rejected the request format or parameters. Check the selected model and API format.'}`);
     }
     if(result.status<200 || result.status>=300)throw new Error(`Provider request failed (HTTP ${result.status}). Try again later.`);
@@ -89,7 +90,7 @@ export async function refreshProviderModels(provider:Provider) {
   const ids=items.filter((m:any)=>provider.format!=='gemini'||m.supportedGenerationMethods?.includes('generateContent')).map((m:any)=>provider.format==='gemini'?m.name?.replace(/^models\//,''):m.id).filter((id:unknown)=>typeof id==='string'&&id.length>0&&id.length<=200);
   const updated={...provider,models:[...new Set<string>(ids)].slice(0,200),verified:true};persist(updated);return updated;
 }
-export function buildCloudBody(provider:Provider,model:string,messages:PersistedMessage[],system:string,maxTokens:number,sources?:WebSource[]) {
+export function buildCloudBody(provider:Provider,model:string,messages:PersistedMessage[],system:string,maxTokens:number,sources?:WebSource[],media?:VisionAttachment) {
   provider={...provider,format:providerFormat(provider)};
   const instruction=system+(sources?.length?sourceEvidence(sources):'');
   // Keep a complete user-first window, skip failed empty replies, merge consecutive roles.
@@ -113,14 +114,29 @@ export function buildCloudBody(provider:Provider,model:string,messages:Persisted
     body={model,messages:formatted,stream:false,...(provider.id==='openai'?{max_completion_tokens:limit}:{max_tokens:limit})};
   }
   if(JSON.stringify(body).length>60000)throw new Error('This conversation is too large to send. Start a new chat or shorten your message.');
+  if(media){
+    const parts=visionParts(media);
+    const payload=body as any;
+    if(provider.format==='gemini'){
+      const last=payload.contents[payload.contents.length-1];
+      if(!last||last.role!=='user')throw new Error('Attach media to a new user message.');
+      last.parts.push(...parts.map(part=>part.type==='text'?{text:part.text}:{inlineData:{mimeType:'image/jpeg',data:part.image_url.url.split(',')[1]}}));
+    } else {
+      const messages=search==='openai'?payload.input:payload.messages;
+      const last=messages[messages.length-1];
+      if(!last||last.role!=='user')throw new Error('Attach media to a new user message.');
+      const content=[{type:'text' as const,text:last.content},...parts];
+      last.content=search==='openai'?content.map(part=>part.type==='text'?{type:'input_text',text:part.text}:{type:'input_image',image_url:part.image_url.url}):provider.format==='anthropic'?content.map(part=>part.type==='text'?part:{type:'image',source:{type:'base64',media_type:'image/jpeg',data:part.image_url.url.split(',')[1]}}):content;
+    }
+  }
   return body;
 }
-export async function completeCloud(selection:CloudSelection,messages:PersistedMessage[],system:string,maxTokens:number,sources?:WebSource[],signal?:AbortSignal,onSources?:(sources:WebSource[])=>void) {
+export async function completeCloud(selection:CloudSelection,messages:PersistedMessage[],system:string,maxTokens:number,sources?:WebSource[],signal?:AbortSignal,onSources?:(sources:WebSource[])=>void,media?:VisionAttachment) {
   const saved=listProviders().find(p=>p.id===selection.providerId);
   const provider=saved?{...saved,format:providerFormat(saved)}:undefined;
   if(!provider)throw new Error('Reconnect this provider in Settings.');
   const search=hostedSearch(provider,selection.model);
-  const data=await request(provider,search==='openai'?'responses':'chat',selection.model,buildCloudBody(provider,selection.model,messages,system,maxTokens,sources),signal);
+  const data=await request(provider,search==='openai'?'responses':'chat',selection.model,buildCloudBody(provider,selection.model,messages,system,maxTokens,sources,media),signal);
   const citations:WebSource[]=[];
   const add=(url:unknown,title:unknown)=>{const safe=safeWebUrl(url);if(safe&&!citations.some(c=>c.url===safe))citations.push({id:citations.length+1,url:safe,title:typeof title==='string'?title.slice(0,200):new URL(safe).hostname,snippet:''});};
   if(search==='openai')for(const item of data.output||[])for(const block of item.content||[])for(const a of block.annotations||[])if(a.type==='url_citation')add(a.url,a.title);

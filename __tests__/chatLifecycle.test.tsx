@@ -21,6 +21,29 @@ jest.mock('../src/services/modelLoadGuard', () => ({
 jest.mock('../src/services/deviceRecommendation', () => ({getDeviceRecommendation: async()=>({reason:'Test',model:{id:'test'},models:[]})}));
 jest.mock('../src/services/contextWindow', () => ({fitContext: async()=>({prompt:'Test',nPredict:32,additionalStops:[],removedMessages:0})}));
 
+test('an image is sent as pixels only after consent and is not persisted in conversation storage',async()=>{
+  jest.useRealTimers();storage.clearAll();jest.clearAllMocks();
+  storage.set('ai_providers',JSON.stringify([{id:'lmstudio',name:'Computer',connectionType:'lmstudio',format:'openai',baseUrl:'https://example.com/v1',models:['lfm2.5-vl']} ]));
+  selectCloud({providerId:'lmstudio',model:'lfm2.5-vl'});
+  const dataUrl='data:image/jpeg;base64,/9j/AA==';
+  NativeModules.DeviceControl.pickFile=jest.fn(async()=>({name:'photo.jpg',content:'',size:'Resized image',kind:'image',frames:[{dataUrl}]}));
+  NativeModules.DeviceControl.requestProvider=jest.fn(async()=>({status:200,body:JSON.stringify({choices:[{message:{content:'Image answer'}}]})}));
+  const alert=jest.spyOn(Alert,'alert');
+  let view!:Renderer.ReactTestRenderer;
+  await act(async()=>{view=Renderer.create(<ChatScreen navigation={{addListener:()=>()=>{},setParams:jest.fn()} as any} route={{params:{}} as any}/>);});
+  await act(async()=>{await view.root.findAllByType(TouchableOpacity).find(b=>b.props.accessibilityLabel==='Attach image, video or text')!.props.onPress();});
+  await act(async()=>view.root.findAllByType(TouchableOpacity).find(b=>b.props.accessibilityLabel==='Send message')!.props.onPress());
+  expect(NativeModules.DeviceControl.requestProvider).not.toHaveBeenCalled();
+  const consent=alert.mock.calls.find(call=>call[0]==='Send to Computer?')!;
+  expect(consent[1]).toContain('resized image');
+  await act(async()=>{consent[2]!.find(b=>b.text==='Send')!.onPress!();});
+  const request=JSON.parse((NativeModules.DeviceControl.requestProvider as jest.Mock).mock.calls[0][4]);
+  expect(request.messages.at(-1).content[1].image_url.url).toBe(dataUrl);
+  expect(JSON.stringify(listConversations())).not.toContain(dataUrl);
+  expect(listConversations()[0].messages.at(-1)?.content).toBe('Image answer');
+  await act(async()=>view.unmount());alert.mockRestore();
+}, 20000);
+
 test('cloud chat asks before transmitting, then responds without loading a local model',async()=>{
   jest.useRealTimers();storage.clearAll();jest.clearAllMocks();
   storage.set('ai_providers',JSON.stringify([{id:'test',name:'Test Provider',format:'openai',baseUrl:'https://example.com/v1',models:['model']} ]));
