@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { ConversationDrawer } from '../components/ConversationDrawer';
 import { getDeviceRecommendation } from '../services/deviceRecommendation';
-import { storage, defaultSettings } from '../services/storage';
+import { storage } from '../services/storage';
 import { getModelFilenameFromUrl } from '../services/modelManager';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -61,7 +61,7 @@ import {GlassBackdrop} from '../components/GlassBackdrop';
 import {withoutAction} from '../services/agentActions';
 import {LunarPulse} from '../components/LunarPulse';
 import {CloudSelection,getCloudSelection,selectCloud,listProviders,completeCloud} from '../services/providers';
-import { AVAILABLE_MODELS, MODEL_CATALOG, ModelMetadata } from '../constants/models';
+import { MODEL_CATALOG, ModelMetadata } from '../constants/models';
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 type Message = PersistedMessage;
 const MODEL_CONTEXT_SIZE = 1024;
@@ -347,6 +347,11 @@ export function ChatScreen({ navigation, route }: Props) {
       listConversations().find(c => c.id === route.params?.conversationId)
         ?.messages || [],
   );
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const keyExtractor = useCallback((item: Message) => item.id, []);
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showModelModal, setShowModelModal] = useState(false);
@@ -422,15 +427,16 @@ export function ChatScreen({ navigation, route }: Props) {
       setSettings(getSettings());
       setCloud(getCloudSelection());
       // A download may have completed in Models without changing the selected URL.
-      if (!getCloudSelection() && !llamaRef.current && getSettings().modelUrl === settings.modelUrl) {
+      if (!getCloudSelection() && !llamaRef.current && getSettings().modelUrl === settingsRef.current.modelUrl) {
         void checkAndInit(modelEpoch.current);
       }
-      if (messages.length && !listConversations().some(c => c.id === conversationId.current)) {
+      if (messagesRef.current.length && !listConversations().some(c => c.id === conversationId.current)) {
         setMessages([]); conversationId.current = generateUniqueId();
       }
     });
     return unsub;
-  }, [navigation, messages.length, settings.modelUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation]);
 
   useEffect(() => {
     if(cloud){setIsAppBooting(false);setModelReady(false);return;}
@@ -483,7 +489,7 @@ export function ChatScreen({ navigation, route }: Props) {
     } catch (e) {
       console.error(e);
     } finally {
-      setIsAppBooting(false);
+      if (mounted.current && epoch === modelEpoch.current) setIsAppBooting(false);
     }
   };
 
@@ -762,14 +768,14 @@ export function ChatScreen({ navigation, route }: Props) {
     }
   };
 
-  const clearChat = () => {
+  const clearChat = useCallback(() => {
     if (generationBusy.current) return;
-    if (messages.length) saveConversation(conversationId.current, messages);
+    if (messagesRef.current.length) saveConversation(conversationId.current, messagesRef.current);
     conversationId.current = generateUniqueId();
     setMessages([]);
     setContextNotice('');
     setInputText(''); setAttachedFile(null);
-  };
+  }, []);
 
   const switchModel = (url: string) => {
     if (generationBusy.current) return;
@@ -828,7 +834,7 @@ export function ChatScreen({ navigation, route }: Props) {
           onScroll={({nativeEvent:e})=>{if(e.contentSize.height-e.layoutMeasurement.height-e.contentOffset.y<80)followReply.current=true;}}
           scrollEventThrottle={32}
           onContentSizeChange={(_,height)=>{contentHeight.current=height;scrollToLatest();}}
-          keyExtractor={item => item.id}
+          keyExtractor={keyExtractor}
           ListEmptyComponent={
             <View style={S.welcome}>
               <Text style={S.welcomeTitle}>{isGlass()?"What’s on\nyour mind?":"A little clarity.\nA lot of possibility."}</Text>

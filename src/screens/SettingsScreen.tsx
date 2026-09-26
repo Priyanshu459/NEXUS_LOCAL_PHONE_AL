@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import {Alert, Image, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Theme, useAppearance, setAppearance, appearanceChoices,reducedTransparency,setReducedTransparency,reducedMotion,setReducedMotion} from '../constants/theme';

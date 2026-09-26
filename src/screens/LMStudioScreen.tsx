@@ -3,7 +3,7 @@ import {ActivityIndicator,Alert,Keyboard,Linking,Pressable,Switch,Text,TextInput
 import {GlassPage,GlassAction} from '../components/GlassPage';
 import {ui} from '../components/Design';
 import {Theme} from '../constants/theme';
-import {listProviders,Provider,saveProvider,refreshProviderModels,removeProvider,selectCloud} from '../services/providers';
+import {listProviders,saveProvider,refreshProviderModels,removeProvider,selectCloud} from '../services/providers';
 import {normalizeStudioUrl} from '../services/lmStudio';
 import {storage} from '../services/storage';
 import {LMStudioGuide} from '../components/LMStudioGuide';

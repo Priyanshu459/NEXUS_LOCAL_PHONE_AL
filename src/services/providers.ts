@@ -122,8 +122,8 @@ export function buildCloudBody(provider:Provider,model:string,messages:Persisted
       if(!last||last.role!=='user')throw new Error('Attach media to a new user message.');
       last.parts.push(...parts.map(part=>part.type==='text'?{text:part.text}:{inlineData:{mimeType:'image/jpeg',data:part.image_url.url.split(',')[1]}}));
     } else {
-      const messages=search==='openai'?payload.input:payload.messages;
-      const last=messages[messages.length-1];
+      const targetMessages=search==='openai'?payload.input:payload.messages;
+      const last=targetMessages[targetMessages.length-1];
       if(!last||last.role!=='user')throw new Error('Attach media to a new user message.');
       const content=[{type:'text' as const,text:last.content},...parts];
       last.content=search==='openai'?content.map(part=>part.type==='text'?{type:'input_text',text:part.text}:{type:'input_image',image_url:part.image_url.url}):provider.format==='anthropic'?content.map(part=>part.type==='text'?part:{type:'image',source:{type:'base64',media_type:'image/jpeg',data:part.image_url.url.split(',')[1]}}):content;

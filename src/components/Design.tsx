@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import MoonlightBrandIcon from './MoonlightBrandIcon';
 const c = Theme.color;
@@ -7,7 +7,7 @@ const c = Theme.color;
 export function MoonMark({ size = 36 }: { size?: number }) {
   return <MoonlightBrandIcon size={size} />;
 }
-export function IconButton({
+export const IconButton = React.memo(function IconButton({
   glyph,
   label,
   onPress,
@@ -36,7 +36,7 @@ export function IconButton({
       </View> : <Text style={ui.glyph}>{glyph}</Text>}
     </TouchableOpacity>
   );
-}
+});
 export function PageIntro({
   eyebrow,
   title,

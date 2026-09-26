@@ -1,12 +1,17 @@
 import React from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, ScrollView, Text, View } from 'react-native';
 import {safeWebUrl} from '../services/webSearch';
 import {Theme, themedStyles, useAppearance, getAppearance} from '../constants/theme';
 
+const INLINE_REGEX = /(\[[^\]]+\]\(https:\/\/[^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`)/g;
+const LINK_REGEX = /^\[([^\]]+)\]\((https:\/\/[^\s)]+)\)$/;
+const HEADING_REGEX = /^#{1,3}\s/;
+const LIST_ITEM_REGEX = /^[-*]\s/;
+
 function inline(text: string) {
-  return text.split(/(\[[^\]]+\]\(https:\/\/[^\s)]+\)|\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
-    const link=/^\[([^\]]+)\]\((https:\/\/[^\s)]+)\)$/.exec(part);
-    const url=link&&safeWebUrl(link[2]);
+  return text.split(INLINE_REGEX).map((part, i) => {
+    const link = LINK_REGEX.exec(part);
+    const url = link && safeWebUrl(link[2]);
     if(url)return <Text key={i} accessibilityRole="link" style={{color:Theme.color.accent,textDecorationLine:'underline'}} onPress={()=>Linking.openURL(url).catch(()=>Alert.alert('Unable to open source','Try again in your browser.'))}>{link![1]}</Text>;
     return (
     <Text
@@ -28,7 +33,7 @@ function inline(text: string) {
   );});
 }
 
-export function AnswerText({ content }: { content: string }) {
+export const AnswerText = React.memo(function AnswerText({ content }: { content: string }) {
   useAppearance();
   return (
     <View>
@@ -50,21 +55,21 @@ export function AnswerText({ content }: { content: string }) {
           );
         }
         return block.split('\n').map((line, j) => {
-          const heading = /^#{1,3}\s/.test(line);
+          const heading = HEADING_REGEX.test(line);
           return (
             <Text
               selectable
               key={`${i}-${j}`}
               style={[S.text, heading && S.heading]}
             >
-              {inline(line.replace(/^#{1,3}\s/, '').replace(/^[-*]\s/, '• '))}
+              {inline(line.replace(HEADING_REGEX, '').replace(LIST_ITEM_REGEX, '• '))}
             </Text>
           );
         });
       })}
     </View>
   );
-}
+});
 const S = themedStyles(() => ({
   text: { color: Theme.color.text, fontSize: getAppearance().largeText ? 20 : 16, lineHeight: getAppearance().largeText ? 30 : 26 },
   bold: { fontWeight: '700' },

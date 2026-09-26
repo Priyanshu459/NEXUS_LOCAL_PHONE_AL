@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Theme, themedStyles, useAppearance } from '../constants/theme';
 import { IconButton, MoonMark } from './Design';
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
   trailing?: React.ReactNode;
   showBrand?: boolean;
 };
-export function AppHeader({
+export const AppHeader = React.memo(function AppHeader({
   title,
   subtitle,
   onMenuPress,
@@ -30,7 +30,7 @@ export function AppHeader({
       )}
     </View>
   );
-}
+});
 const S = themedStyles(() => ({
   header: {
     minHeight: 72,

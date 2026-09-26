@@ -90,8 +90,8 @@ android {
         applicationId "com.moonknightstudio.moonlightai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 19
-        versionName "1.7.0"
+        versionCode 20
+        versionName "1.7.1"
         if (project.hasProperty('moonlightPreview')) {
             applicationIdSuffix ".preview"
             versionNameSuffix "-preview"
