@@ -1,17 +1,27 @@
 jest.mock('../src/config/compliance', () => ({
   AI_REPORT_ENDPOINT: 'https://reports.example.test/v1/ai-response',
   PRIVACY_POLICY_URL: '',
+  AI_REPORT_EMAIL: 'reports@example.test',
+  PRIVACY_CONTACT_EMAIL: 'reports@example.test',
 }));
 
 import {
   buildAiReportPayload,
+  dispatchAiReport,
   DuplicateAiReportError,
+  isAiReportingConfigured,
+  isAiReportingEndpointConfigured,
   resetAiReportRateLimitForTests,
   submitAiReport,
 } from '../src/services/aiReportService';
 
-describe('AI response reporting', () => {
+describe('AI response reporting (configured endpoint)', () => {
   beforeEach(() => resetAiReportRateLimitForTests());
+
+  it('detects that the HTTPS reporting endpoint is configured', () => {
+    expect(isAiReportingEndpointConfigured()).toBe(true);
+    expect(isAiReportingConfigured()).toBe(true);
+  });
 
   it('minimizes the payload to the reported response and explicit report fields', () => {
     const payload = buildAiReportPayload({
@@ -33,6 +43,28 @@ describe('AI response reporting', () => {
     expect(payload).not.toHaveProperty('attachments');
     expect(payload).not.toHaveProperty('deviceId');
     expect(payload).not.toHaveProperty('modelFile');
+  });
+
+  it('attempts a POST request with headers and minimal JSON body', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue({ ok: true, status: 200 });
+    const input = {
+      responseId: 'assistant-post',
+      responseText: 'Harmful content',
+      category: 'Harmful or dangerous' as const,
+      explanation: 'Unsafe instructions',
+    };
+
+    const result = await dispatchAiReport(input, { fetchImpl });
+    expect(result).toEqual({ method: 'endpoint', success: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://reports.example.test/v1/ai-response',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildAiReportPayload(input)),
+      }),
+    );
   });
 
   it('reports network failures without recording a duplicate', async () => {
@@ -75,5 +107,20 @@ describe('AI response reporting', () => {
       DuplicateAiReportError,
     );
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects missing or empty reported response gracefully', async () => {
+    const fetchImpl = jest.fn();
+    await expect(
+      submitAiReport(
+        {
+          responseId: 'assistant-empty',
+          responseText: '   ',
+          category: 'Other',
+        },
+        fetchImpl,
+      ),
+    ).rejects.toThrow(/missing or empty/i);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

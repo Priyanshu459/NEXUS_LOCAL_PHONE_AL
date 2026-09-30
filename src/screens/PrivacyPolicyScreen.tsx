@@ -92,12 +92,14 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
         </Text>
         <Text style={styles.heading}>Response reports</Text>
         <Text style={styles.body}>
-          If response reporting is configured and you choose to submit a report,
-          Moonlight AI sends only the reported assistant response, its response
-          identifier, your selected category, and any explanation you enter. It
-          does not include the rest of the conversation, memories, attachments,
-          model files, or device identifiers. You preview and confirm the data
-          before it is sent.
+          When you report an AI response, Moonlight AI submits only the reported
+          assistant response, its response identifier, your selected category,
+          and any explanation you enter. If an HTTPS reporting server is
+          configured, reports are transmitted securely over HTTPS; otherwise,
+          your device's email application is opened with the pre-filled report
+          addressed to our developer support team. Reports do not include the rest
+          of your conversation, memories, attachments, model files, or device
+          identifiers. You preview and confirm the report data before sending.
         </Text>
         <Text style={styles.heading}>Retention and deletion</Text>
         <Text style={styles.body}>

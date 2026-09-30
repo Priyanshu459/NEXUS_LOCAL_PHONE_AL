@@ -50,7 +50,8 @@ import {
   AI_REPORT_CATEGORIES,
   AiReportCategory,
   isAiReportingConfigured,
-  submitAiReport,
+  isAiReportingEndpointConfigured,
+  dispatchAiReport,
 } from '../services/aiReportService';
 import { fitContext } from '../services/contextWindow';
 import { listConversations, saveConversation } from '../services/conversations';
@@ -88,7 +89,7 @@ function ReportResponseModal({
   onClose: () => void;
 }) {
   useAppearance();
-  const reportingConfigured = isAiReportingConfigured();
+  const endpointConfigured = isAiReportingEndpointConfigured();
   const [category, setCategory] = useState<AiReportCategory>(
     'Harmful or dangerous',
   );
@@ -96,7 +97,7 @@ function ReportResponseModal({
   const [previewing, setPreviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<{
-    kind: 'success' | 'failure';
+    kind: 'success' | 'email_opened' | 'failure';
     text: string;
   } | null>(null);
 
@@ -111,17 +112,31 @@ function ReportResponseModal({
   }, [message]);
 
   const submit = async () => {
-    if (!message) return;
+    if (!message || submitting) return;
+    if (!message.content?.trim()) {
+      setStatus({
+        kind: 'failure',
+        text: 'The response to report is missing or empty.',
+      });
+      return;
+    }
     setSubmitting(true);
     setStatus(null);
     try {
-      await submitAiReport({
+      const result = await dispatchAiReport({
         responseId: message.id,
         responseText: message.content,
         category,
         explanation,
       });
-      setStatus({ kind: 'success', text: 'Report submitted. Thank you.' });
+      if (result.method === 'endpoint') {
+        setStatus({ kind: 'success', text: 'Report submitted. Thank you.' });
+      } else {
+        setStatus({
+          kind: 'email_opened',
+          text: 'Email application opened. Please review and send your prefilled report email.',
+        });
+      }
     } catch (error: any) {
       setStatus({
         kind: 'failure',
@@ -148,17 +163,7 @@ function ReportResponseModal({
             </TouchableOpacity>
           </View>
           <ScrollView style={S.reportScroll}>
-            {!reportingConfigured ? (
-              <>
-                <Text style={S.reportNotice} accessibilityRole="alert">
-                  Response reporting is not currently configured for this build.
-                  No information has been sent.
-                </Text>
-                <TouchableOpacity style={S.reportSecondary} onPress={onClose}>
-                  <Text style={S.reportSecondaryText}>Close</Text>
-                </TouchableOpacity>
-              </>
-            ) : !previewing ? (
+            {!previewing ? (
               <>
                 <Text style={S.reportLabel}>Category</Text>
                 {AI_REPORT_CATEGORIES.map(option => (
@@ -188,6 +193,7 @@ function ReportResponseModal({
                 <TouchableOpacity
                   style={S.reportPrimary}
                   onPress={() => setPreviewing(true)}
+                  accessibilityRole="button"
                 >
                   <Text style={S.reportPrimaryText}>Review report</Text>
                 </TouchableOpacity>
@@ -195,9 +201,9 @@ function ReportResponseModal({
             ) : (
               <>
                 <Text style={S.reportNotice}>
-                  Only the information below will be sent. The rest of your
-                  conversation, memories, files, model, and device identifiers
-                  are not included.
+                  {endpointConfigured
+                    ? 'Only the information below will be sent to the secure reporting endpoint. The rest of your conversation, memories, files, model, and device identifiers are not included.'
+                    : 'This will prepare a report in your email app addressed to the developer. Only the information below is included. You can review the email before sending.'}
                 </Text>
                 <Text style={S.reportLabel}>Category</Text>
                 <Text style={S.reportPreviewText}>{category}</Text>
@@ -214,9 +220,9 @@ function ReportResponseModal({
                 {status ? (
                   <Text
                     style={
-                      status.kind === 'success'
-                        ? S.reportSuccess
-                        : S.reportFailure
+                      status.kind === 'failure'
+                        ? S.reportFailure
+                        : S.reportSuccess
                     }
                     accessibilityRole="alert"
                   >
@@ -228,25 +234,43 @@ function ReportResponseModal({
                     style={[S.reportPrimary, submitting && S.reportDisabled]}
                     onPress={() => void submit()}
                     disabled={submitting}
+                    accessibilityRole="button"
                   >
                     <Text style={S.reportPrimaryText}>
                       {submitting
-                        ? 'Sending…'
+                        ? (endpointConfigured ? 'Sending…' : 'Opening email…')
                         : status?.kind === 'failure'
                         ? 'Retry'
-                        : 'Confirm and send'}
+                        : status?.kind === 'email_opened'
+                        ? 'Open email again'
+                        : (endpointConfigured ? 'Confirm and send' : 'Open in email app')}
                     </Text>
                   </TouchableOpacity>
-                ) : null}
+                ) : (
+                  <TouchableOpacity
+                    style={S.reportPrimary}
+                    onPress={onClose}
+                    accessibilityRole="button"
+                  >
+                    <Text style={S.reportPrimaryText}>Done</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity
                   style={S.reportSecondary}
                   onPress={() => {
-                    setPreviewing(false);
-                    setStatus(null);
+                    if (status?.kind === 'success' || status?.kind === 'email_opened') {
+                      onClose();
+                    } else {
+                      setPreviewing(false);
+                      setStatus(null);
+                    }
                   }}
                   disabled={submitting}
+                  accessibilityRole="button"
                 >
-                  <Text style={S.reportSecondaryText}>Back</Text>
+                  <Text style={S.reportSecondaryText}>
+                    {status?.kind === 'success' || status?.kind === 'email_opened' ? 'Close' : 'Back'}
+                  </Text>
                 </TouchableOpacity>
               </>
             )}
