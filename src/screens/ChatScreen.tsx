@@ -89,6 +89,7 @@ function ReportResponseModal({
   onClose: () => void;
 }) {
   useAppearance();
+  const insets = useSafeAreaInsets();
   const endpointConfigured = isAiReportingEndpointConfigured();
   const [category, setCategory] = useState<AiReportCategory>(
     'Harmful or dangerous',
@@ -155,7 +156,7 @@ function ReportResponseModal({
       onRequestClose={onClose}
     >
       <View style={S.reportOverlay}>
-        <View style={S.reportSheet}>
+        <View style={[S.reportSheet, { paddingBottom: insets.bottom + 18 }]}>
           <View style={S.reportHeader}>
             <Text style={S.reportTitle}>Report response</Text>
             <TouchableOpacity onPress={onClose} accessibilityRole="button">

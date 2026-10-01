@@ -7,6 +7,7 @@
  */
 export const OFFICIAL_WEBSITE_URL = 'https://moonlight-ai-app.pages.dev/';
 export const PRIVACY_POLICY_URL = 'https://moonlight-ai-app.pages.dev/privacy';
+export const TERMS_OF_SERVICE_URL = 'https://moonlight-ai-app.pages.dev/terms';
 export const PRIVACY_CONTACT_EMAIL = 'priyanshu09016@gmail.com';
 
 /**

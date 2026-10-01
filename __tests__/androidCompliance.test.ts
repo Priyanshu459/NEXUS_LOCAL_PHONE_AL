@@ -79,10 +79,21 @@ describe('Android release compliance configuration', () => {
     );
     // Android must permit opt-in private LAN HTTP; native policy separately rejects cloud/public HTTP.
     expect(buildGradle).toContain('usesCleartextTraffic: "true"');
+    expect(buildGradle).toContain('androidComponents');
+    expect(buildGradle).toContain('ext.buildTypes.named("release").configure');
     expect(buildGradle).toContain('debuggable false');
     expect(buildGradle).toContain('signingConfig null');
     expect(buildGradle).not.toContain(
       'release {\n            signingConfig signingConfigs.debug',
     );
+
+    const mergedReleaseManifestPath = path.join(
+      repoRoot,
+      'android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml',
+    );
+    if (fs.existsSync(mergedReleaseManifestPath)) {
+      const mergedManifest = fs.readFileSync(mergedReleaseManifestPath, 'utf8');
+      expect(mergedManifest).toContain('android:usesCleartextTraffic="true"');
+    }
   });
 });

@@ -53,8 +53,6 @@ function App(): React.JSX.Element {
     <SafeAreaProvider>
       <StatusBar
         barStyle={isDark() ? 'light-content' : 'dark-content'}
-        translucent
-        backgroundColor="transparent"
       />
       <AppUpdateNotice />
       <NavigationContainer>

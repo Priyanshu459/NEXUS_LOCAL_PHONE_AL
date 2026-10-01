@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
-import { AVAILABLE_MODELS } from '../constants/models';
+import { MODEL_CATALOG } from '../constants/models';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ModelAttribution'>;
 
@@ -87,7 +87,7 @@ export function ModelAttributionScreen({ navigation }: Props) {
           The models listed below are created, licensed, and hosted by third parties.
         </Text>
 
-        {AVAILABLE_MODELS.map(model => {
+        {MODEL_CATALOG.map(model => {
           const attr = attributionData[model.id] || {
             originalPublisher: model.originalPublisher, originalModelLink: model.originalModelUrl,
             ggufPublisher: model.quantizationPublisher, license: model.licenseIdentifier,

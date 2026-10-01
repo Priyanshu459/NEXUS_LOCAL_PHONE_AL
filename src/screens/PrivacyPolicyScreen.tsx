@@ -15,9 +15,11 @@ import type { RootStackParamList } from '../../App';
 import {
   hasPublishedPrivacyPolicy,
   openPublishedPrivacyPolicy,
+  openPublishedTermsOfService,
 } from '../services/privacyPolicy';
 import {
   OFFICIAL_WEBSITE_URL,
+  PRIVACY_POLICY_URL,
   PRIVACY_CONTACT_EMAIL,
 } from '../config/compliance';
 
@@ -26,7 +28,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PrivacyPolicy'>;
 export function PrivacyPolicyScreen({ navigation }: Props) {
   useAppearance();
   const insets = useSafeAreaInsets();
-  const published = hasPublishedPrivacyPolicy();
+  const publishedPolicy = hasPublishedPrivacyPolicy();
+
   const openLink = async (url: string) => {
     try {
       await Linking.openURL(url);
@@ -37,6 +40,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
       );
     }
   };
+
   const openPolicy = async () => {
     try {
       await openPublishedPrivacyPolicy();
@@ -47,6 +51,18 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
       );
     }
   };
+
+  const openTerms = async () => {
+    try {
+      await openPublishedTermsOfService();
+    } catch {
+      Alert.alert(
+        'Unable to open link',
+        'Please check your connection and try again.',
+      );
+    }
+  };
+
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <GlassBackdrop/>
@@ -61,68 +77,99 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
         <View style={styles.headerSpacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.updated}>Effective date: September 17, 2026</Text>
-        <Text style={styles.heading}>LM Studio connections</Text>
-        <Text style={styles.body}>Connecting LM Studio sends the selected conversation and instructions to your configured computer server. That server can route models through its own LM Link. Moonlight does not join LM Link directly. Server tokens are encrypted in Android Keystore. Private-IP HTTP requires opting in and is not encrypted by Moonlight; use a trusted network, a VPN, or HTTPS. Public HTTP destinations and redirects are blocked by the provider transport.</Text>
-        <Text style={styles.heading}>Local data</Text>
+        <Text style={styles.updated}>Effective date: October 1, 2026</Text>
+
+        <Text style={styles.heading}>Architecture Overview</Text>
         <Text style={styles.body}>
-          Chats, settings, saved memories, downloaded GGUF models, and text read
-          from documents you select are stored or processed on your device.
-          Moonlight AI does not include user accounts, advertising SDKs,
-          or analytics SDKs. Optional cloud inference is described below.
+          Moonlight AI is built on a local-first architecture. It does not include
+          user accounts, profile tracking, advertising SDKs, or analytics trackers.
+          The application differentiates strictly between on-device processing and
+          user-configured optional external services.
         </Text>
-        <Text style={styles.heading}>Network activity</Text>
-        <Text style={styles.body}>When you choose a cloud model, Moonlight asks before sending a conversation to that provider. Up to 20 recent messages, your personal instructions, approved text attachments and search excerpts are sent for the answer. Saved memories are not included. The provider processes this data under its own policies and may charge for API usage. Provider keys are encrypted with keys held in Android Keystore; removal in AI providers deletes the saved credential. Connection metadata, chats and memories use application-private storage without additional app-level encryption. No API keys are embedded in the app.</Text>
+
+        <Text style={styles.heading}>Local Processing (On-Device)</Text>
         <Text style={styles.body}>
-          Moonlight AI connects to Hugging Face to resolve and download models
-          you choose. Hugging Face receives normal network information such as
-          your IP address and request metadata under its own terms and privacy
-          policy.
+          When using on-device models, text generation runs entirely on your phone
+          using local GGUF models via llama.rn. Your conversations, settings, saved
+          memories, downloaded model files, and document text read through the Android
+          system picker are stored solely in application-private storage on your device.
+          These local records are not uploaded or transmitted to the developer.
         </Text>
-        <Text style={styles.heading}>Documents and speech</Text>
-        <Text style={styles.body}>For vision models, selected images are resized and converted to JPEG; short videos are represented by four sampled frames without audio. These are sent only after you confirm the selected provider. Media pixels are not stored in chat history. Temporary processing files are deleted after preparation; reattach media for follow-up questions. Resizing can remove fine detail.</Text>
-        <Text style={styles.body}>Supported OpenAI and Anthropic cloud models can automatically use provider web search. The provider processes conversation context and generated search queries under its policies; tool fees may apply. Source links are saved with the answer. Opening a source contacts its website. The old alpha search-server connection and Agent mode have been removed. There is no Gmail connection.</Text>
+
+        <Text style={styles.heading}>Optional Cloud AI Providers</Text>
         <Text style={styles.body}>
-          The Android system document picker grants access only to a document
-          you select. Supported text is read into the current local chat. Voice
-          input launches the device's speech-recognition provider. That provider
-          may process audio over a network depending on your device and
-          settings. Moonlight AI does not directly receive or store microphone
-          audio; it receives recognized text.
+          If you choose to configure a cloud provider (such as OpenAI, Google Gemini,
+          Anthropic, Alibaba Cloud, or NVIDIA), Moonlight AI asks for confirmation
+          before sending your conversation to that service. Up to 20 recent messages,
+          your custom system instructions, approved text attachments, and search excerpts
+          are sent over encrypted HTTPS for generation. Saved memories are not included.
+          API keys are stored encrypted using Android Keystore (AES-256 GCM) and are never
+          bundled in the application. Each provider processes data according to its own
+          terms and privacy policy.
         </Text>
-        <Text style={styles.heading}>Response reports</Text>
+
+        <Text style={styles.heading}>Optional Web Search</Text>
         <Text style={styles.body}>
-          When you report an AI response, Moonlight AI submits only the reported
-          assistant response, its response identifier, your selected category,
-          and any explanation you enter. If an HTTPS reporting server is
-          configured, reports are transmitted securely over HTTPS; otherwise,
-          your device's email application is opened with the pre-filled report
-          addressed to our developer support team. Reports do not include the rest
-          of your conversation, memories, attachments, model files, or device
-          identifiers. You preview and confirm the report data before sending.
+          Supported cloud models can perform web searches through provider-native tools.
+          Additionally, when configured with a search connection, search queries are
+          sent over HTTPS to retrieve relevant source excerpts. Cited URLs are stored
+          with answers. Tapping a citation opens that third-party website directly in
+          your browser.
         </Text>
-        <Text style={styles.heading}>Retention and deletion</Text>
+
+        <Text style={styles.heading}>LM Studio Connections</Text>
         <Text style={styles.body}>
-          Use the app's clear-chat, memory-management, and model-removal
-          controls to delete local data. Uninstalling the app removes its
-          application-private data subject to Android backup and device
-          behavior. The report operator must publish its report-retention period
-          before reporting is enabled.
+          Connecting to LM Studio routes selected messages and instructions to your
+          configured computer or server. Server authorization tokens are encrypted in
+          Android Keystore. Unencrypted HTTP is permitted only for literal private IPv4
+          addresses on your local trusted network (such as 192.168.x.x); public HTTP
+          destinations and redirects are blocked.
         </Text>
-        <Text style={styles.heading}>Security and children</Text>
+
+        <Text style={styles.heading}>Agent Actions & Human Review</Text>
         <Text style={styles.body}>
-          Application-private storage and HTTPS reduce exposure but no device or
-          transmission is perfectly secure. Moonlight AI is not directed to
-          children under 13. A final target-audience decision and any
-          region-specific age obligations must be completed before publication.
+          The assistant may propose actions such as viewing a destination in Maps,
+          sharing text via the system share sheet, or adding an event to Calendar.
+          Moonlight AI never executes actions autonomously. Every action requires
+          your explicit review and confirmation before any external app is opened.
         </Text>
-        <Text style={styles.heading}>Third parties, changes, and contact</Text>
+
+        <Text style={styles.heading}>Media, Documents, and Voice</Text>
         <Text style={styles.body}>
-          Third-party services include Hugging Face and your device's
-          speech-recognition provider. Their policies apply to their processing.
-          Material policy changes will be reflected in the published policy with
-          an updated effective date.
+          For vision models, user-selected images are resized and short videos are
+          represented by four sampled frames without audio. Media frames are sent only
+          to your confirmed cloud provider and are not retained in chat history after
+          generation. Voice input utilizes your device’s built-in Android speech-recognition
+          service; Moonlight AI receives recognized text and does not record or store raw
+          microphone audio.
         </Text>
+
+        <Text style={styles.heading}>AI Response Reports</Text>
+        <Text style={styles.body}>
+          You can report problematic AI responses using the in-app "Report response"
+          action. Reports include only the reported assistant response, its identifier,
+          your selected category, and any explanation you provide. Reports never include
+          your broader conversation history, personal documents, device identifiers, or
+          API keys. Reports are sent via an HTTPS endpoint when configured, or via a
+          pre-filled email to our support team.
+        </Text>
+
+        <Text style={styles.heading}>Retention and Deletion</Text>
+        <Text style={styles.body}>
+          You can delete individual conversations, clear all chats, delete memories,
+          and remove downloaded model files at any time using the in-app controls.
+          Uninstalling the app removes its private local data. Android cloud backup is
+          disabled (android:allowBackup="false") to ensure deleted data is not restored
+          by cloud backup services.
+        </Text>
+
+        <Text style={styles.heading}>Security and Children</Text>
+        <Text style={styles.body}>
+          Private app storage and HTTPS minimize exposure, though no software system is
+          entirely free of risk. Moonlight AI is intended for general audiences and is
+          not directed to children under 13.
+        </Text>
+
         <TouchableOpacity
           style={styles.textLink}
           onPress={() => openLink(OFFICIAL_WEBSITE_URL)}
@@ -131,6 +178,16 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
         >
           <Text style={styles.linkText}>Official Moonlight AI website</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.textLink}
+          onPress={openTerms}
+          accessibilityRole="link"
+          accessibilityLabel="Open the Terms of Service"
+        >
+          <Text style={styles.linkText}>Terms of Service</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.textLink}
           onPress={() => openLink(`mailto:${PRIVACY_CONTACT_EMAIL}`)}
@@ -141,7 +198,8 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
             Privacy contact: {PRIVACY_CONTACT_EMAIL}
           </Text>
         </TouchableOpacity>
-        {published ? (
+
+        {publishedPolicy ? (
           <TouchableOpacity
             style={styles.linkButton}
             onPress={openPolicy}
@@ -151,9 +209,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           </TouchableOpacity>
         ) : (
           <Text style={styles.pending}>
-            Public HTTPS publication and owner contact are pending. This in-app
-            copy is provided for review and is not a substitute for the required
-            public URL.
+            Public HTTPS publication is accessible at: {PRIVACY_POLICY_URL}
           </Text>
         )}
       </ScrollView>

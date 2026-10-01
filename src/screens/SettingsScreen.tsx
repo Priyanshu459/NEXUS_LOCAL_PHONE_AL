@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {Alert, Image, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Alert, Image, Linking, ScrollView, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Theme, useAppearance, setAppearance, appearanceChoices,reducedTransparency,setReducedTransparency,reducedMotion,setReducedMotion} from '../constants/theme';
 import {GlassBackdrop} from '../components/GlassBackdrop';
@@ -11,6 +11,7 @@ import {clearConversations} from '../services/conversations';
 import {MoonMark} from '../components/Design';
 import {SettingsIcon} from '../components/SettingsIcon';
 import {SoftwareNotices} from '../components/SoftwareNotices';
+import {TERMS_OF_SERVICE_URL} from '../config/compliance';
 
 const sections = [
   ['AI providers','Your API keys & cloud models'],
@@ -100,10 +101,11 @@ export function SettingsScreen({navigation}: any) {
           {key:'maxTokens',label:'Response token limit',help:'Maximum new tokens per answer.',step:128,min:64,max:2048}] as const).map(item=><View key={item.key} style={ui.row}><View style={ui.flex}><Text style={ui.body}>{item.label}</Text><Text style={ui.small}>{item.help}</Text></View><IconButton glyph="−" label={`Decrease ${item.label}`} onPress={()=>update({[item.key]:Math.max(item.min,Number((settings[item.key]-item.step).toFixed(2)))})}/><Text style={ui.body}>{settings[item.key]}</Text><IconButton glyph="＋" label={`Increase ${item.label}`} onPress={()=>update({[item.key]:Math.min(item.max,Number((settings[item.key]+item.step).toFixed(2)))})}/></View>)}
       </>}
       {panel==='About & help'&&<>
-        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.7.0 · Glass alpha</Text>
+        <Text style={[ui.title,{fontSize:29}]}>Moonlight AI</Text><Text style={ui.body}>Version 1.7.3 · Glass alpha</Text>
         {row('Model licenses & attribution','',()=>navigation.navigate('ModelAttribution'))}
         {row('Software licenses','Open-source notices',()=>setPanel('Software licenses'))}
         {row('Privacy policy','',()=>navigation.navigate('PrivacyPolicy'))}
+        {row('Terms of service','',()=>Linking.openURL(TERMS_OF_SERVICE_URL).catch(()=>Alert.alert('Unable to open link','Check your connection.')))}
         <Text style={ui.section}>Download failed?</Text><Text style={ui.body}>Check your connection and available storage, then retry. Keep the app open during large downloads.</Text>
         <Text style={ui.section}>Slow or failed responses?</Text><Text style={ui.body}>Try a smaller model, close other apps, or shorten the conversation. Device recommendations are estimates, not speed guarantees.</Text>
         <Text style={ui.section}>Voice unavailable?</Text><Text style={ui.body}>Install or enable a speech-recognition service on your phone. You can always type instead.</Text>

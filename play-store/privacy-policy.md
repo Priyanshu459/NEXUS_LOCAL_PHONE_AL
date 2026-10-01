@@ -1,52 +1,71 @@
-# Privacy Policy Draft
+# Privacy Policy
 
-Effective date: 2026-08-26
+Effective date: October 1, 2026
 
-Owner action required: publish this policy at a live HTTPS URL before Google Play submission, then set that URL in `src/config/compliance.ts`.
+Published URL: `https://moonlight-ai-app.pages.dev/privacy`
+Terms of Service: `https://moonlight-ai-app.pages.dev/terms`
+Support / Privacy Contact: `priyanshu09016@gmail.com`
 
-## App
+## App Overview
 
-Moonlight AI is an Android app that lets users run and manage local GGUF language models, chat with those models, import user-selected files, and optionally report AI responses that appear inappropriate or inaccurate.
+Moonlight AI is an Android app that lets users run and manage local GGUF language models, chat with those models, import user-selected documents, and optionally connect to cloud AI providers, local LM Studio servers, or web search services. Moonlight AI does not include user accounts, profile tracking, advertising SDKs, or analytics trackers.
 
-## Information processed on the device
+## Information Processed Locally on the Device
 
-The app stores chats, settings, memories, selected model metadata, and imported document text on the user's device. Local model inference is designed to run on the device. These local items are not sent to the app developer unless the user takes an action that sends data off the device, such as reporting an AI response or downloading a model.
+The app stores conversations, settings, saved memories, selected model metadata, and imported document text solely on the user's device in application-private storage. Local model inference is executed on-device using llama.rn. These local items are not uploaded or transmitted to the app developer.
 
-## Model downloads
+Users may delete conversations, clear memories, and remove downloaded models at any time within the app. Android cloud backup is disabled (`android:allowBackup="false"`).
 
-When a user downloads a model, the app connects to the model host selected in the app. The host may receive network information such as IP address, request metadata, and download activity according to that host's own terms and privacy policy.
+## Optional Cloud AI Providers
 
-## Voice input
+If a user explicitly chooses to configure and select a third-party cloud AI provider (such as OpenAI, Google Gemini, Anthropic, Alibaba Cloud, or NVIDIA), up to 20 recent messages, custom system instructions, approved text attachments, and search excerpts are sent over encrypted HTTPS for response generation. Saved memories are not included. API keys are stored encrypted on-device in Android Keystore (AES-256 GCM). Data sent to third-party providers is governed by the respective provider's terms and privacy policy.
+
+## Optional Web Search
+
+Supported cloud models can perform web searches using provider-native tools. Additionally, when a search connection is configured, search queries are transmitted over HTTPS to retrieve relevant source excerpts. Cited URLs are stored with the answer. Opening a source link navigates directly to that third-party website.
+
+## Optional LM Studio Connections
+
+Connecting to LM Studio routes selected messages and instructions to the user's configured computer or server. Server authorization tokens are encrypted in Android Keystore. Unencrypted HTTP is permitted only for literal private IPv4 addresses on the user's trusted local network; public HTTP destinations and redirects are blocked.
+
+## Agent Actions & Human Review
+
+The assistant may propose actions such as viewing a destination in Maps, sharing text via the system share sheet, or adding an event to Calendar. Moonlight AI never executes actions autonomously; every action requires explicit user review and confirmation before any external app is opened.
+
+## Model Downloads
+
+When a user downloads a model, the app connects directly to the model host (such as Hugging Face) over HTTPS. The host may receive standard network request information such as IP address and request metadata under its own terms and privacy policy.
+
+## Voice Input
 
 Voice input uses the Android speech-recognition provider available on the user's device. The app receives recognized text from that provider. The app does not directly record, store, or transmit microphone audio.
 
-## User-selected files
+## User-Selected Files and Media
 
-Users may select files through the Android system picker. The app reads the selected file so it can be used in local chat context. Users should not import files they do not want processed by the app.
+Users may select files through the Android system picker. The app reads plain text from selected documents into local chat context. For vision models, user-selected images or video frames are converted to temporary base64 frames and transmitted only to the confirmed cloud provider.
 
-## AI response reports
+## AI Response Reports
 
-If reporting is enabled, users may submit a report about a specific AI response. A report contains:
+Users may submit a report about a specific AI response. A report contains:
 
 - Report category.
 - The reported AI response text.
 - Optional user explanation.
 - A response identifier.
 
-Reports do not include the full conversation, memories, imported files, device identifiers, model files, or hidden prompts. Reports are used to investigate safety, quality, and policy issues.
-
-Owner action required: define retention, deletion, access controls, and contact process for the production reporting backend before launch.
+Reports do not include full conversation history, memories, imported files, device identifiers, or API credentials. Reports are sent via an HTTPS reporting endpoint when configured, or through the device's native email client addressed to our support team.
 
 ## Children
 
-The app is not prepared for a child-directed launch. Until a separate child-safety review is complete, list the app for adults only and avoid marketing it to children.
+Moonlight AI is intended for general audiences and is not directed to children under 13.
 
 ## Security
 
-Network calls must use HTTPS. The app does not contain backend credentials or signing keys. Users should protect their device lock screen because local app data is stored on the device.
+Network calls for cloud providers, web search, model downloads, and reporting require HTTPS. The app stores credentials in Android Keystore with AES-256 GCM encryption.
 
-## Deletion and contact
+## Contact and Data Deletion
 
-Owner action required: add a monitored privacy contact email and deletion-request process before publication.
+To request assistance, report an issue, or ask privacy questions, contact:
 
-Privacy contact: [OWNER: add monitored privacy email]
+Privacy contact: `priyanshu09016@gmail.com`
+Official website: `https://moonlight-ai-app.pages.dev/`

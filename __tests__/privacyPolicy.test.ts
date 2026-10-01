@@ -1,8 +1,10 @@
 import { Linking } from 'react-native';
 import {
   hasPublishedPrivacyPolicy,
+  hasPublishedTermsOfService,
   isActiveHttpsUrl,
   openPublishedPrivacyPolicy,
+  openPublishedTermsOfService,
 } from '../src/services/privacyPolicy';
 
 describe('privacy policy link', () => {
@@ -19,6 +21,15 @@ describe('privacy policy link', () => {
     await expect(openPublishedPrivacyPolicy()).resolves.toBeUndefined();
     expect(spy).toHaveBeenCalledWith(
       'https://moonlight-ai-app.pages.dev/privacy',
+    );
+  });
+
+  it('opens the configured public terms of service', async () => {
+    const spy = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    expect(hasPublishedTermsOfService()).toBe(true);
+    await expect(openPublishedTermsOfService()).resolves.toBeUndefined();
+    expect(spy).toHaveBeenCalledWith(
+      'https://moonlight-ai-app.pages.dev/terms',
     );
   });
 });

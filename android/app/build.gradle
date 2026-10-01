@@ -90,8 +90,8 @@ android {
         applicationId "com.moonknightstudio.moonlightai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 21
-        versionName "1.7.2"
+        versionCode 22
+        versionName "1.7.3"
         if (project.hasProperty('moonlightPreview')) {
             applicationIdSuffix ".preview"
             versionNameSuffix "-preview"
@@ -129,6 +129,14 @@ android {
             debuggable false
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+    }
+}
+
+androidComponents {
+    finalizeDsl { ext ->
+        ext.buildTypes.named("release").configure {
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
         }
     }
 }
