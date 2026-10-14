@@ -1,12 +1,11 @@
 import React from 'react';
 import Renderer, {act} from 'react-test-renderer';
-import {Alert,NativeModules, TextInput,TouchableOpacity} from 'react-native';
+import {Alert, NativeModules, TouchableOpacity} from 'react-native';
 import {selectCloud} from '../src/services/providers';
 import {initLlama} from 'llama.rn';
 import {ChatScreen} from '../src/screens/ChatScreen';
 import {getSettings, saveSettings, storage} from '../src/services/storage';
 import {listConversations} from '../src/services/conversations';
-import {saveSearchConnection} from '../src/services/webSearch';
 
 let mockFocused = true;
 jest.mock('@react-navigation/native', () => ({useIsFocused: () => mockFocused}));

@@ -1,8 +1,9 @@
 package com.moonknightstudio.moonlightai
 
+import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
-import androidx.core.view.WindowCompat
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -12,14 +13,12 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     setTheme(R.style.AppTheme)
-    enableEdgeToEdge()
+    // Edge-to-edge configuration compliant with Android 15/16 (API 35+)
+    enableEdgeToEdge(
+        statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+    )
     super.onCreate(null)
-
-    // Ensure status and navigation bar icon appearance matches Moonlight's dark theme (light icons)
-    WindowCompat.getInsetsController(window, window.decorView).apply {
-      isAppearanceLightStatusBars = false
-      isAppearanceLightNavigationBars = false
-    }
   }
 
   /**

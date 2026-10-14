@@ -90,3 +90,11 @@ graphify-out/
 
 # Local release build script
 build_release.ps1
+
+# Loose build binaries and logs
+*.apk
+*.aab
+*.log
+security-audit-*.json
+SHA256SUMS.txt
+

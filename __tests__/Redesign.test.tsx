@@ -5,7 +5,7 @@ import { SettingsScreen } from '../src/screens/SettingsScreen';
 import { GalleryScreen } from '../src/screens/GalleryScreen';
 import { ChatScreen } from '../src/screens/ChatScreen';
 import { getSettings, storage } from '../src/services/storage';
-import {disconnectSearch, saveSearchConnection} from '../src/services/webSearch';
+import {disconnectSearch} from '../src/services/webSearch';
 
 jest.setTimeout(30000);
 jest.mock('@react-navigation/native', () => ({

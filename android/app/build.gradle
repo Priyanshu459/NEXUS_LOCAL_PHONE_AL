@@ -57,7 +57,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -90,8 +90,8 @@ android {
         applicationId "com.moonknightstudio.moonlightai"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 22
-        versionName "1.7.3"
+        versionCode 23
+        versionName "1.7.4"
         if (project.hasProperty('moonlightPreview')) {
             applicationIdSuffix ".preview"
             versionNameSuffix "-preview"
@@ -146,7 +146,7 @@ gradle.taskGraph.whenReady { graph ->
         task.path == ":app:bundleRelease" || task.path == ":app:assembleRelease"
     }
     if (requestsReleaseArtifact && !hasUploadSigning) {
-        throw new GradleException(
+        throw new org.gradle.api.GradleException(
             "Production signing is required. Set MOONLIGHT_UPLOAD_STORE_FILE, " +
             "MOONLIGHT_UPLOAD_STORE_PASSWORD, MOONLIGHT_UPLOAD_KEY_ALIAS, and " +
             "MOONLIGHT_UPLOAD_KEY_PASSWORD. Release artifacts are never signed with the debug key."
